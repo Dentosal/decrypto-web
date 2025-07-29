@@ -1,0 +1,69 @@
+.row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 10px;
+    width: 100%;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 10px;
+    width: 100%;
+}
+
+.spacer {
+    flex: 1;
+}
+
+#error {
+    pointer-events: none;
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+#error.severity-info {
+    background-color: rgba(173, 216, 230, 0.9);
+}
+
+#error.severity-warning {
+    background-color: rgba(255, 255, 0, 0.9);
+}
+
+#error.severity-error {
+    background-color: rgba(240, 128, 128, 0.9);
+}
+
+
+body, input {
+    font-family: ui-monospace,
+        Menlo, Monaco,
+        "Cascadia Mono", "Segoe UI Mono",
+        "Roboto Mono",
+        "Oxygen Mono",
+        "Ubuntu Mono",
+        "Source Code Pro",
+        "Fira Mono",
+        "Droid Sans Mono",
+        "Consolas", "Courier New", monospace;
+}
+
+#topbar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 2px;
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 20px;
+}
+
+#lobby-teams > div {
+    padding: 10px;
+    border: 1px solid #ccc;
+    flex: 1;
+}

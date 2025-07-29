@@ -1,0 +1,53 @@
+.row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 10px;
+    width: 100%;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 10px;
+    width: 100%;
+}
+
+.keywords > div {
+    font-size: 2rem;
+    padding: 2rem;
+    text-align: center;
+}
+
+.rounds {
+    max-height: 80vh;
+    align-items: flex-start;
+}
+
+.rounds > div {
+    min-width: 100px;
+}
+
+.rounds > .row > *:not(:first-child) {
+    border: 1px solid black;
+}
+
+table, th, tr, td {
+    border: 1px solid black;
+    border-collapse: collapse;
+}
+
+.game-view {
+    flex: 1;
+}
+
+.sidebar {
+    min-width: 300px;
+    max-width: 500px;
+    justify-content: flex-start;
+}
+
+.sidebar > div {
+    border: 1px solid black;
+}

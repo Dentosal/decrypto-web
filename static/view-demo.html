@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="view-demo.css">
+    <title>Document</title>
+</head>
+<body>
+    <div class="row">
+        <div class="game-view">
+            <div class="row keywords">
+                <div>1.<br>Example</div>
+                <div>2.<br>Keywords</div>
+                <div>3.<br>Are</div>
+                <div>4.<br>Here</div>
+            </div>
+            <div class="history column">
+                <div>
+                    <h2>Your team</h2>
+                    <div class="row rounds">
+                        <div>
+                            <h3>Round 1</h3>
+                            <span class="encryptor">aa</span>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            (No intercept)
+                        </div>
+                        <div>
+                            <h3>Round 2</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 3</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 4</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 5</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 6</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 7</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 8</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h2>Opponent team</h2>
+                    <div class="row rounds">
+                        <div>
+                            <h3>Round 1</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            (No intercept)
+                        </div>
+                        <div>
+                            <h3>Round 2</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 3</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 4</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 5</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 6</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 7</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                        <div>
+                            <h3>Round 8</h3>
+                            <table>
+                                <tr><td>Clue 1</td><td>1</td><td>2</td></tr>
+                                <tr><td>Clue 2</td><td>3</td><td>3</td></tr>
+                                <tr><td>Clue 3</td><td>2</td><td>1</td></tr>
+                            </table>
+                            Intercept: 1-3-2 NOT SUCCESSFUL
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="clue-view row">
+                <div>
+                    <h2>Your team</h2>
+                    <table>
+                        <thead>
+                            <th>Round</th>
+                            <th>1</th>
+                            <th>2</th>
+                            <th>3</th>
+                            <th>4</th>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>Example</td>
+                                <td>Test</td>
+                                <td></td>
+                                <td>Word</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>6</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>7</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>8</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <h2>Opponent team</h2>
+                    <table>
+                        <thead>
+                            <th>Round</th>
+                            <th>1</th>
+                            <th>2</th>
+                            <th>3</th>
+                            <th>4</th>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>Example</td>
+                                <td>Test</td>
+                                <td></td>
+                                <td>Word</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>6</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>7</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                            <tr>
+                                <td>8</td>
+                                <td></td>
+                                <td>Weird</td>
+                                <td>Things</td>
+                                <td>Yellow</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar column">
+            <div>
+                <h1>Global chat</h1>
+                <div class="column">
+                    <div>msg1</div>
+                    <div>msg2</div>
+                    <div>msg3</div>
+                </div>
+                <input type="text" placeholder="Type your message here...">
+            </div>
+            <div>
+                <h1>[encryptor/decryptor] [team] chat</h1>
+                <div class="column">
+                    <div>msg1</div>
+                    <div>msg2</div>
+                    <div>msg3</div>
+                </div>
+                <input type="text" placeholder="Type your message here...">
+            </div>
+            <div>
+                <h1>player-action</h1>
+                <div class="give-clues column">
+                    <div>
+                        <h2>Clue for 1 - Example</h2>
+                        <input type="text" placeholder="clue">
+                        <input type="button" value="Lock in">
+                        <input type="button" value="draw it instead!">
+                    </div>
+                    <div>
+                        <h2>Clue for 4 - Here</h2>
+                        <input type="text" placeholder="clue">
+                        <input type="button" value="Lock in">
+                        <input type="button" value="draw it instead!">
+                    </div>
+                    <div>
+                        <h2>Clue for 2 - Word</h2>
+                        <input type="text" placeholder="clue">
+                        <input type="button" value="Lock in">
+                        <input type="button" value="draw it instead!">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

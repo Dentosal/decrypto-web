@@ -1,0 +1,695 @@
+use std::{collections::HashMap, hash::Hash, option};
+
+use axum::extract::ws::WebSocket;
+use futures::{SinkExt, stream::SplitSink};
+use rand::seq::IndexedRandom;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    decrypto::{
+        GameInfo, GameInfoState, GamePlayerInfo, GameState, Phase, Team, settings::GameSettings,
+    },
+    id::{ConnectionId, GameId, UserId, UserSecret},
+    message::{
+        ChatMessage, CurrentRound, ErrorSeverity, FromClient, GameStateView, GameView, PlayerInfo,
+        ToClient, UserInfo,
+    },
+};
+
+#[derive(Default)]
+pub struct State {
+    clients: HashMap<ConnectionId, ClientData>,
+    users: HashMap<UserId, UserData>,
+    games: HashMap<GameId, GameInfo>,
+}
+
+pub struct ClientData {
+    outbound: SplitSink<WebSocket, axum::extract::ws::Message>,
+    authenticated_as: Option<UserId>,
+}
+
+pub struct UserData {
+    /// Null if not connected at the moment.
+    connection_id: Option<ConnectionId>,
+    /// Secret used to authenticate the user.
+    secret: UserSecret,
+    /// User-given nickname.
+    nick: Option<String>,
+    /// Joined game, if any.
+    game: Option<GameId>,
+}
+
+impl State {
+    pub async fn send_to_connection(&mut self, id: ConnectionId, msg: ToClient) {
+        println!("Sending message to client {id:?}: {:?}", msg);
+        let msg = axum::extract::ws::Message::Text(serde_json::to_string(&msg).unwrap().into());
+        let client = self.clients.get_mut(&id).expect("Client should exist");
+        let _ = client.outbound.send(msg).await;
+    }
+
+    pub async fn send_error<S>(&mut self, id: ConnectionId, msg: S, severity: ErrorSeverity)
+    where
+        S: Into<String>,
+    {
+        self.send_to_connection(
+            id,
+            ToClient::Error {
+                message: msg.into(),
+                severity,
+            },
+        )
+        .await;
+    }
+
+    #[must_use]
+    async fn require_auth(&mut self, connnection_id: ConnectionId) -> Result<UserId, ()> {
+        if let Some(user_id) = self
+            .clients
+            .get(&connnection_id)
+            .expect("Should exist")
+            .authenticated_as
+        {
+            Ok(user_id)
+        } else {
+            self.send_error(connnection_id, "Auth required", ErrorSeverity::Error)
+                .await;
+            Err(())
+        }
+    }
+
+    #[must_use]
+    async fn require_game(
+        &mut self,
+        connnection_id: ConnectionId,
+        user_id: UserId,
+    ) -> Result<GameId, ()> {
+        if let Some(game_id) = self.users.get(&user_id).expect("Should exist").game {
+            Ok(game_id)
+        } else {
+            self.send_error(connnection_id, "You are not in a game", ErrorSeverity::Info)
+                .await;
+            Err(())
+        }
+    }
+
+    pub async fn on_connect(
+        &mut self,
+        id: ConnectionId,
+        outbound: SplitSink<WebSocket, axum::extract::ws::Message>,
+    ) {
+        self.clients.insert(
+            id,
+            ClientData {
+                outbound,
+                authenticated_as: None,
+            },
+        );
+    }
+
+    pub async fn on_disconnect(&mut self, id: ConnectionId) {
+        let client = self.clients.remove(&id).expect("Should exist");
+        if let Some(user_id) = client.authenticated_as {
+            let user_data = self.users.get_mut(&user_id).expect("Should exist");
+            user_data.connection_id = None;
+            if let Some(game_id) = user_data.game {
+                self.broadcast_game_state(game_id).await;
+            }
+        }
+    }
+
+    fn find_client_by_secret(&mut self, secret: UserSecret) -> Option<UserId> {
+        for (user_id, user_data) in &self.users {
+            if user_data.secret == secret {
+                debug_assert!(self.users.get(user_id).is_some());
+                return Some(*user_id);
+            }
+        }
+        return None;
+    }
+
+    /// Gather latest state view and send it to the user.
+    async fn send_state_to_user(&mut self, user_id: UserId) {
+        let user_data = self.users.get(&user_id).expect("Should exist");
+
+        let game = user_data.game.map(|game_id| {
+            let game_info = self.games.get(&game_id).expect("Should exist");
+
+            let mut players: Vec<_> = game_info
+                .players
+                .iter()
+                .map(|(player_id, info)| {
+                    let player_info = self.users.get(player_id).expect("Should exist");
+                    PlayerInfo {
+                        id: *player_id,
+                        connected: player_info.connection_id.is_some(),
+                        nick: player_info.nick.clone().expect("Should exist"),
+                        team: info.team,
+                    }
+                })
+                .collect();
+            players.sort_by_key(|p| p.id);
+
+            let state = match &game_info.state {
+                GameInfoState::Lobby => GameStateView::Lobby {
+                    reason_not_startable: game_info.startable().err().map(|e| e.to_owned()),
+                },
+                GameInfoState::InGame {
+                    teams,
+                    completed_rounds,
+                    current_round,
+                    phase,
+                } => {
+                    if let Some(team) = game_info.team_for_user(user_id) {
+                        let team_info = &teams[team.index()];
+
+                        GameStateView::InGame {
+                            keywords: team_info.keywords.clone(),
+                            completed_rounds: completed_rounds.clone(),
+                            current_round: current_round.as_ref().map(|rt| {
+                                let r = &rt[team];
+                                CurrentRound {
+                                    encryptor: r.encryptor,
+                                    code: if r.encryptor == user_id {
+                                        Some(r.code.clone())
+                                    } else {
+                                        None
+                                    },
+                                    clues: r.clues.clone(),
+                                    decipher: r.decipher.clone(),
+                                    intercept: r.intercept.clone(),
+                                }
+                            }),
+                            phase: *phase,
+                        }
+                    } else {
+                        GameStateView::InGameNotInTeam
+                    }
+                }
+            };
+
+            GameView {
+                id: game_id,
+                global_chat: game_info.global_chat.clone(),
+                players,
+                state,
+                settings: game_info.settings.clone(),
+            }
+        });
+
+        let state = ToClient::State {
+            user_info: UserInfo {
+                id: user_id,
+                secret: user_data.secret.clone(),
+                nick: user_data.nick.clone(),
+            },
+            game,
+        };
+        self.send_to_connection(user_data.connection_id.expect("Should exist"), state)
+            .await;
+    }
+
+    async fn broadcast_game_state(&mut self, game_id: GameId) {
+        let users_in_game: Vec<_> = self
+            .games
+            .get(&game_id)
+            .expect("Game should exist")
+            .players
+            .keys()
+            .copied()
+            .collect();
+        for user_id in users_in_game {
+            if self
+                .users
+                .get(&user_id)
+                .expect("Should exist")
+                .connection_id
+                .is_none()
+            {
+                continue; // Don't send state to users that are not connected.
+            }
+            self.send_state_to_user(user_id).await;
+        }
+    }
+
+    pub async fn on_message(&mut self, id: ConnectionId, msg: FromClient) -> Result<(), ()> {
+        match msg {
+            FromClient::Auth { secret } => {
+                let user_id = if let Some(secret) = secret {
+                    if let Some(user_id) = self.find_client_by_secret(secret) {
+                        println!("Client {id:?} auth ok, user {user_id:?}");
+                        self.users
+                            .get_mut(&user_id)
+                            .expect("Should exist")
+                            .connection_id = Some(id);
+                        Some(user_id)
+                    } else {
+                        println!("Client {id:?} secret not recognized");
+                        self.send_to_connection(
+                            id,
+                            ToClient::Error {
+                                message: "Your previous session has expired".to_owned(),
+                                severity: ErrorSeverity::Info,
+                            },
+                        )
+                        .await;
+                        None
+                    }
+                } else {
+                    println!("Client {id:?} auth without secret");
+                    None
+                };
+
+                let user_id = match user_id {
+                    Some(user_id) => user_id,
+                    None => {
+                        // Create a new user with a random secret.
+                        let user_id = UserId::new();
+                        let secret = UserSecret::new();
+                        println!("Client {id:?} creating new user, id {user_id:?}");
+                        self.users.insert(
+                            user_id,
+                            UserData {
+                                connection_id: Some(id),
+                                secret,
+                                nick: None,
+                                game: None,
+                            },
+                        );
+                        user_id
+                    }
+                };
+
+                self.clients
+                    .get_mut(&id)
+                    .expect("Should exist")
+                    .authenticated_as = Some(user_id);
+
+                self.send_state_to_user(user_id).await;
+                Ok(())
+            }
+            FromClient::SetNick(nick) => {
+                let user_id = self.require_auth(id).await?;
+                if nick.len() < 2 || nick.len() > 64 {
+                    self.send_error(
+                        id,
+                        "Nickname must be between 2 and 64 characters",
+                        ErrorSeverity::Info,
+                    )
+                    .await;
+                    return Ok(());
+                }
+
+                let user_data = self.users.get_mut(&user_id).expect("Should exist");
+                user_data.nick = Some(nick);
+                if let Some(game_id) = user_data.game {
+                    self.broadcast_game_state(game_id).await;
+                } else {
+                    self.send_state_to_user(user_id).await;
+                }
+                Ok(())
+            }
+            FromClient::CreateLobby => {
+                let user_id = self.require_auth(id).await?;
+
+                if self
+                    .users
+                    .get_mut(&user_id)
+                    .expect("Should exist")
+                    .game
+                    .is_some()
+                {
+                    self.send_error(id, "You are already in a game", ErrorSeverity::Info)
+                        .await;
+                    return Ok(());
+                }
+
+                let game_id = GameId::new();
+                println!("Client {id:?} creating a new lobby {game_id:?}");
+
+                let mut game_info = GameInfo::default();
+                game_info.players.insert(user_id, GamePlayerInfo::default());
+                self.games.insert(game_id, game_info);
+
+                self.users.get_mut(&user_id).expect("Should exist").game = Some(game_id);
+
+                // XXX: do we want to keep this? Insert user to white team by default?
+                let player_info = self
+                    .games
+                    .get_mut(&game_id)
+                    .expect("Should exist")
+                    .players
+                    .get_mut(&user_id)
+                    .expect("Should exist");
+                player_info.team = Some(Team::WHITE);
+
+                self.send_state_to_user(user_id).await;
+
+                Ok(())
+            }
+            FromClient::JoinLobby(game_id) => {
+                let user_id = self.require_auth(id).await?;
+
+                let Some(game_info) = self.games.get_mut(&game_id) else {
+                    self.send_error(id, "Game not found", ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                };
+
+                if !game_info.players.contains_key(&user_id) {
+                    game_info.players.insert(user_id, GamePlayerInfo::default());
+                    self.users.get_mut(&user_id).expect("Should exist").game = Some(game_id);
+
+                    // XXX: do we want to keep this? Insert user to the team with the least players?
+                    let team = if game_info.players_in_team(Team::WHITE).len()
+                        < game_info.players_in_team(Team::BLACK).len()
+                    {
+                        Team::WHITE
+                    } else {
+                        Team::BLACK
+                    };
+                    let player_info = game_info.players.get_mut(&user_id).expect("Should exist");
+                    player_info.team = Some(team);
+                }
+
+                self.broadcast_game_state(game_id).await;
+                Ok(())
+            }
+            FromClient::LeaveLobby => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let user_data = self.users.get_mut(&user_id).expect("Should exist");
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                game_info.players.remove(&user_id);
+                user_data.game = None;
+
+                self.broadcast_game_state(game_id).await;
+                self.send_state_to_user(user_id).await;
+                Ok(())
+            }
+            FromClient::JoinTeam(team) => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                let player_info = game_info.players.get_mut(&user_id).expect("Should exist");
+                player_info.team = Some(team);
+                self.broadcast_game_state(game_id).await;
+                Ok(())
+            }
+            FromClient::Kick(kick_user_id) => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                if !game_info.players.contains_key(&kick_user_id) {
+                    self.send_error(id, "User not in game", ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                }
+
+                // Only allow kicking users that are not connected, for now.
+                let kick_user_data = self.users.get(&kick_user_id).expect("Should exist");
+                if kick_user_data.connection_id.is_some() {
+                    self.send_error(
+                        id,
+                        "You can only kick users that are not connected",
+                        ErrorSeverity::Info,
+                    )
+                    .await;
+                    return Err(());
+                }
+
+                game_info.players.remove(&kick_user_id);
+                let kick_user_data = self.users.get_mut(&kick_user_id).expect("Should exist");
+                kick_user_data.game = None;
+                self.broadcast_game_state(game_id).await;
+                Ok(())
+            }
+            FromClient::StartGame => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                if let Err(e) = game_info.startable() {
+                    self.send_to_connection(
+                        id,
+                        ToClient::Error {
+                            message: e.to_owned(),
+                            severity: ErrorSeverity::Info,
+                        },
+                    )
+                    .await;
+                    return Err(());
+                }
+
+                game_info.start();
+                self.broadcast_game_state(game_id).await;
+                Ok(())
+            }
+            FromClient::SubmitClues(clues) => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                if let Some(team) = game_info.team_for_user(user_id) {
+                    if let GameInfoState::InGame {
+                        current_round,
+                        phase,
+                        ..
+                    } = &mut game_info.state
+                    {
+                        if *phase != Phase::Encrypt {
+                            self.send_error(id, "Encrypt phase is not active", ErrorSeverity::Info)
+                                .await;
+                            return Err(());
+                        }
+
+                        let Some(current_round) = current_round else {
+                            self.send_error(id, "No round in progress", ErrorSeverity::Info)
+                                .await;
+                            return Err(());
+                        };
+
+                        // Only allow sending clues if the user is the encryptor for their team.
+                        if current_round[team].encryptor != user_id {
+                            self.send_error(
+                                id,
+                                "You are not the encryptor for your team",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
+                            return Err(());
+                        }
+
+                        // Require correct number of clues.
+                        if clues.len() != game_info.settings.clue_count {
+                            self.send_error(
+                                id,
+                                "Incorrect number of clues submitted",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
+                            return Err(());
+                        }
+
+                        // TODO: Validate clues.
+                        // * Reusing clues is not allowed.
+                        // * Clues must be unique.
+                        // * Clues must be valid according to the game settings.
+                        // * Clues must not be empty.
+                        // * Clues must not be too long.
+                        // * Clues must not contain team keywords.
+
+                        // Check for resubmission.
+                        if current_round[team].clues.is_some() {
+                            // Already submitted clues, cannot submit again.
+                            self.send_error(id, "Clues already submitted", ErrorSeverity::Info)
+                                .await;
+                            return Err(());
+                        }
+
+                        // Success.
+                        game_info.global_chat.push(ChatMessage::system(format!(
+                            "<@{user_id:?}> submitted clues {clues:?}"
+                        )));
+                        current_round[team].clues = Some(clues);
+                        game_info.proceed_if_ready();
+                        self.broadcast_game_state(game_id).await;
+                        Ok(())
+                    } else {
+                        self.send_error(id, "Gaem not in progress", ErrorSeverity::Info)
+                            .await;
+                        Err(())
+                    }
+                } else {
+                    self.send_error(id, "You are not in a team", ErrorSeverity::Info)
+                        .await;
+                    Err(())
+                }
+            }
+            FromClient::SubmitDecipher(attempt) => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                if let Some(team) = game_info.team_for_user(user_id) {
+                    if let GameInfoState::InGame {
+                        current_round,
+                        phase,
+                        ..
+                    } = &mut game_info.state
+                    {
+                        let Phase::Decipher(team_to_decipher) = *phase else {
+                            self.send_error(
+                                id,
+                                "Decipher phase is not active",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
+                            return Err(());
+                        };
+
+                        if team != team_to_decipher {
+                            self.send_error(
+                                id,
+                                "You are not allowed to submit decipher clues for the other team",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
+                            return Err(());
+                        }
+
+                        let Some(current_round) = current_round else {
+                            self.send_error(id, "No round in progress", ErrorSeverity::Info)
+                                .await;
+                            return Err(());
+                        };
+
+                        if current_round[team].encryptor == user_id {
+                            self.send_error(
+                                id,
+                                "You are not allowed to submit decipher clues as an encryptor",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
+                            return Err(());
+                        }
+
+                        // Require correct number of clues.
+                        if attempt.len() != game_info.settings.clue_count {
+                            self.send_error(id, "Incorrect format", ErrorSeverity::Info)
+                                .await;
+                            return Err(());
+                        }
+
+                        // TODO: Validate more:
+                        // * Correct range
+                        // * No duplicates
+
+                        // Check for resubmission.
+                        if current_round[team].decipher.is_some() {
+                            // Already submitted, cannot submit again.
+                            self.send_error(id, "Decipher already submitted", ErrorSeverity::Info)
+                                .await;
+                            return Err(());
+                        }
+
+                        // Success.
+                        game_info.global_chat.push(ChatMessage::system(format!(
+                            "<@{user_id:?}> submitted decipher {attempt:?}"
+                        )));
+                        current_round[team].decipher = Some(attempt);
+                        game_info.proceed_if_ready();
+                        self.broadcast_game_state(game_id).await;
+                        Ok(())
+                    } else {
+                        self.send_error(id, "Gaem not in progress", ErrorSeverity::Info)
+                            .await;
+                        Err(())
+                    }
+                } else {
+                    self.send_error(id, "You are not in a team", ErrorSeverity::Info)
+                        .await;
+                    Err(())
+                }
+            }
+            FromClient::SubmitIntercept(attempt) => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                if let Some(team) = game_info.team_for_user(user_id) {
+                    if let GameInfoState::InGame {
+                        current_round,
+                        phase,
+                        ..
+                    } = &mut game_info.state
+                    {
+                        let Phase::Intercept(team_to_intercept) = *phase else {
+                            self.send_error(
+                                id,
+                                "Intercept phase is not active",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
+                            return Err(());
+                        };
+
+                        if team == team_to_intercept {
+                            self.send_error(
+                                id,
+                                "You cannot intercept your own team's clues",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
+                            return Err(());
+                        }
+
+                        let Some(current_round) = current_round else {
+                            self.send_error(id, "No round in progress", ErrorSeverity::Info)
+                                .await;
+                            return Err(());
+                        };
+
+                        // Require correct number of clues.
+                        if attempt.len() != game_info.settings.clue_count {
+                            self.send_error(id, "Incorrect format", ErrorSeverity::Info)
+                                .await;
+                            return Err(());
+                        }
+
+                        // TODO: Validate more:
+                        // * Correct range
+                        // * No duplicates
+
+                        // Check for resubmission.
+                        if current_round[team].intercept.is_some() {
+                            // Already submitted, cannot submit again.
+                            self.send_error(id, "Intercept already submitted", ErrorSeverity::Info)
+                                .await;
+                            return Err(());
+                        }
+
+                        // Success.
+                        game_info.global_chat.push(ChatMessage::system(format!(
+                            "<@{user_id:?}> submitted intercept {attempt:?}"
+                        )));
+                        current_round[team].intercept = Some(attempt);
+                        game_info.proceed_if_ready();
+                        self.broadcast_game_state(game_id).await;
+                        Ok(())
+                    } else {
+                        self.send_error(id, "Gaem not in progress", ErrorSeverity::Info)
+                            .await;
+                        Err(())
+                    }
+                } else {
+                    self.send_error(id, "You are not in a team", ErrorSeverity::Info)
+                        .await;
+                    Err(())
+                }
+            }
+        }
+    }
+}
