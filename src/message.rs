@@ -20,6 +20,7 @@ pub enum FromClient {
     SubmitClues(Vec<Clue>),
     SubmitDecipher(Vec<usize>),
     SubmitIntercept(Vec<usize>),
+    GlobalChat(String),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -47,8 +48,15 @@ pub struct UserInfo {
 #[serde(rename_all = "snake_case")]
 pub struct PlayerInfo {
     pub id: UserId,
+    /// Whether the player is connected to the game.
     pub connected: bool,
+    /// If the player is still in the game lobby.
+    /// Note that a disconnected player is still considerent present if they have not been kicked.
+    /// If `false`, the player has been kicked or has left the game otherwise.
+    pub is_in_game: bool,
+    //// Nickname of the player.
     pub nick: String,
+    /// None for the players that have not joined a team yet, or have been kicked.
     pub team: Option<Team>,
 }
 
@@ -58,6 +66,7 @@ pub struct PlayerInfo {
 pub struct GameView {
     pub id: GameId,
     pub settings: GameSettings,
+    /// All players that have ever been in this game.
     pub players: Vec<PlayerInfo>,
     pub global_chat: Vec<ChatMessage>,
     #[serde(flatten)]

@@ -2,6 +2,7 @@ import { html, render } from 'https://unpkg.com/lit-html?module';
 import viewLobby from './lobby.js';
 import viewInGame from './in_game.js';
 import topbar from './topbar.js';
+import sidebar from './sidebar.js';
 
 const state = {
     ws: null,
@@ -10,6 +11,7 @@ const state = {
     nickname_input: '',
     decipher_input: '',
     intercept_input: '',
+    global_chat_input: '',
     clue_inputs: [],
     override_view: null,
     error: null,
@@ -99,11 +101,13 @@ const createLobby = () => {
 
 const viewNotInLobby = () => {
     return html`
+    <div id="welcome">
         <div>
-            To join a lobby, please use a link sent by the host.
-            <br>
-            <input type="button" @click=${createLobby} value="Create lobby">
+        To join a lobby, please use a link sent by the host.
         </div>
+        <br>
+        <input type="button" @click=${createLobby} value="Create lobby">
+    </div>
     `;
 };
 
@@ -122,21 +126,28 @@ const currentView = () => {
         return html`<p>Joining lobby...</p>`;
     }
 
-    let view = viewNotInLobby;
     if (state.game) {
+        let view;
         if ("lobby" in state.game) {
             view = viewLobby;
         } else {
             view = viewInGame;
         }
+        return html`${topbar(state)}<div class="row">${[view(state), sidebar(state)]}</div>`;
     }
 
-    return html`${[topbar(state), view(state)]}`;
+    return html`${[topbar(state), viewNotInLobby(state)]}`;
 }
 
 const update = () => {
     render(currentView(), document.getElementById('app'));
+    // Auto-focus on nickname input if it's visible
     document.getElementById("nick-input")?.focus();
+    // Auto-scroll to bottom of messages
+    // TODO: only do this if new messages were added
+    for (const el of document.querySelectorAll('.messages')) {
+        el.scrollTop = el.scrollHeight;
+    }
 };
 
 // Methods accessible from the child modules
@@ -158,7 +169,3 @@ window.onhashchange = () => {
 
 // debug helper, remove this later?
 window.state = state;
-
-//     // Auto-scroll to bottom
-//     const container = document.getElementById('messages');
-//     container.scrollTop = container.scrollHeight;

@@ -46,17 +46,45 @@ pub struct GameInfo {
     /// Settings for the game.
     pub settings: GameSettings,
     pub global_chat: Vec<ChatMessage>,
-    pub players: HashMap<UserId, GamePlayerInfo>,
+    ///  All players that have ever been in this game.
+    players: HashMap<UserId, GamePlayerInfo>,
     pub state: GameInfoState,
 }
 
 impl GameInfo {
+    pub fn add_player(&mut self, user_id: UserId) {
+        self.players.insert(user_id, GamePlayerInfo::default());
+    }
+
+    /// Also used when the player leaves the game themselves.
+    pub fn kick_player(&mut self, user_id: UserId) {
+        let info = self.players.get_mut(&user_id).expect("Should exist");
+        let old_team = match self.state {
+            GameInfoState::Lobby => None,
+            GameInfoState::InGame { .. } => info.access_to_info(),
+        };
+        *info = GamePlayerInfo::LeftGame(old_team);
+    }
+
+    pub fn players(&self) -> &HashMap<UserId, GamePlayerInfo> {
+        &self.players
+    }
+
+    /// XXX: This is a hack to allow modifying players in dev code.
+    pub fn hack_players_mut(&mut self) -> &mut HashMap<UserId, GamePlayerInfo> {
+        &mut self.players
+    }
+
     pub fn startable(&self) -> Result<(), String> {
         if !matches!(self.state, GameInfoState::Lobby) {
             return Err("Only games in lobby can be started".to_owned());
         }
 
-        if self.players.values().any(|info| info.team.is_none()) {
+        if self
+            .players
+            .values()
+            .any(|info| matches!(info, GamePlayerInfo::NotInTeam))
+        {
             return Err("All players must join a team before starting the game".to_owned());
         }
 
@@ -64,7 +92,7 @@ impl GameInfo {
             if self
                 .players
                 .values()
-                .filter(|info| info.team == Some(team))
+                .filter(|info| **info == GamePlayerInfo::InTeam(team))
                 .count()
                 < 2
             {
@@ -79,7 +107,7 @@ impl GameInfo {
         self.players
             .iter()
             .filter_map(|(id, info)| {
-                if info.team == Some(team) {
+                if *info == GamePlayerInfo::InTeam(team) {
                     Some(*id)
                 } else {
                     None
@@ -89,7 +117,9 @@ impl GameInfo {
     }
 
     pub fn team_for_user(&self, user_id: UserId) -> Option<Team> {
-        self.players.get(&user_id).and_then(|info| info.team)
+        self.players
+            .get(&user_id)
+            .and_then(|info| info.access_to_info())
     }
 
     pub fn start(&mut self) {
@@ -205,10 +235,29 @@ impl GameInfo {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct GamePlayerInfo {
-    /// New players joining the game will have this set to None.
-    pub team: Option<Team>,
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GamePlayerInfo {
+    /// Recently joined and not in a team yet.
+    #[default]
+    NotInTeam,
+    /// Player is in a team.
+    InTeam(Team),
+    /// Player left the game, or was kicked from it.
+    /// They can rejoin later, in which case the team will stay the same.
+    /// This prevents a kicked player from rejoining a game with a different team.
+    /// If you're kicked while in a lobby, this will be `LeftGame(None)` as no info has been given yet.
+    LeftGame(Option<Team>),
+}
+impl GamePlayerInfo {
+    /// Returns the team of the player, if they are in a team.
+    pub fn access_to_info(&self) -> Option<Team> {
+        match self {
+            GamePlayerInfo::InTeam(team) => Some(*team),
+            GamePlayerInfo::LeftGame(team) => *team,
+            _ => None,
+        }
+    }
 }
 
 /// State-specific information about the game.

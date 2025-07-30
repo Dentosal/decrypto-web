@@ -1,3 +1,7 @@
+div {
+    box-sizing: border-box;
+}
+
 .row {
     display: flex;
     flex-direction: row;
@@ -16,6 +20,10 @@
 
 .spacer {
     flex: 1;
+}
+
+.wrap {
+    flex-wrap: wrap;
 }
 
 #error {
@@ -53,17 +61,77 @@ body, input {
         "Consolas", "Courier New", monospace;
 }
 
+body {
+    margin: 0;
+    padding: 0;
+}
+
 #topbar {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
     padding: 2px;
-    border-bottom: 1px solid #ccc;
-    margin-bottom: 20px;
+    margin-bottom: 0;
+    background-color: #cec;
+}
+
+#sidebar {
+    min-width: 350px;
+    gap: 0;
+}
+
+#welcome, #lobby, #in_game {
+    padding: 10px;
 }
 
 #lobby-teams > div {
     padding: 10px;
     border: 1px solid #ccc;
     flex: 1;
+    min-width: 350px;
+}
+
+#sidebar {
+    background-color: #eee;
+}
+
+.global-chat {
+    padding: 10px;
+    min-width: 300px;
+    background-color: #cce;
+}
+
+.messages {
+    max-height: 50vh;
+    min-height: 100px;
+    overflow-y: scroll;
+    padding-right: 10px;
+    gap: 5px;
+}
+
+.chat-message {
+    gap: 10px;
+    justify-content: space-between;
+}
+
+.chat-message .mention {
+    background-color: #aaa;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+.system-msg > .author {
+    font-style: italic;
+}
+
+.player-list {
+    gap: 15px;
+    padding: 20px;
+    border-radius: 5px;
+}
+
+.team {
+    border: 1px solid #aaa;
+    border-radius: 5px;
+    padding: 5px 10px;
 }

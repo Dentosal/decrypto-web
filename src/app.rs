@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash, option};
+use std::{collections::HashMap, fmt::format, hash::Hash, option};
 
 use axum::extract::ws::WebSocket;
 use futures::{SinkExt, stream::SplitSink};
@@ -135,7 +135,7 @@ impl State {
             let game_info = self.games.get(&game_id).expect("Should exist");
 
             let mut players: Vec<_> = game_info
-                .players
+                .players()
                 .iter()
                 .map(|(player_id, info)| {
                     let player_info = self.users.get(player_id).expect("Should exist");
@@ -143,7 +143,14 @@ impl State {
                         id: *player_id,
                         connected: player_info.connection_id.is_some(),
                         nick: player_info.nick.clone().expect("Should exist"),
-                        team: info.team,
+                        team: match info {
+                            GamePlayerInfo::InTeam(team) => Some(*team),
+                            _ => None,
+                        },
+                        is_in_game: match info {
+                            GamePlayerInfo::LeftGame(_) => false,
+                            _ => true,
+                        },
                     }
                 })
                 .collect();
@@ -213,7 +220,7 @@ impl State {
             .games
             .get(&game_id)
             .expect("Game should exist")
-            .players
+            .players()
             .keys()
             .copied()
             .collect();
@@ -300,8 +307,16 @@ impl State {
                 }
 
                 let user_data = self.users.get_mut(&user_id).expect("Should exist");
-                user_data.nick = Some(nick);
+                let old_nick = user_data.nick.replace(nick);
                 if let Some(game_id) = user_data.game {
+                    let old_nick = old_nick.expect("In game, should have a nick");
+                    self.games
+                        .get_mut(&game_id)
+                        .expect("Should exist")
+                        .global_chat
+                        .push(ChatMessage::system(format!(
+                            "<{user_id}> changed nick (was {old_nick})",
+                        )));
                     self.broadcast_game_state(game_id).await;
                 } else {
                     self.send_state_to_user(user_id).await;
@@ -327,20 +342,22 @@ impl State {
                 println!("Client {id:?} creating a new lobby {game_id:?}");
 
                 let mut game_info = GameInfo::default();
-                game_info.players.insert(user_id, GamePlayerInfo::default());
+                game_info.add_player(user_id);
+                game_info.global_chat.push(ChatMessage::system(format!(
+                    "<{user_id}> created a new lobby"
+                )));
                 self.games.insert(game_id, game_info);
 
                 self.users.get_mut(&user_id).expect("Should exist").game = Some(game_id);
 
                 // XXX: do we want to keep this? Insert user to white team by default?
-                let player_info = self
+                *self
                     .games
                     .get_mut(&game_id)
                     .expect("Should exist")
-                    .players
+                    .hack_players_mut()
                     .get_mut(&user_id)
-                    .expect("Should exist");
-                player_info.team = Some(Team::WHITE);
+                    .expect("Should exist") = GamePlayerInfo::InTeam(Team::WHITE);
 
                 self.send_state_to_user(user_id).await;
 
@@ -354,9 +371,51 @@ impl State {
                         .await;
                     return Err(());
                 };
+                let game_has_started = matches!(game_info.state, GameInfoState::InGame { .. });
 
-                if !game_info.players.contains_key(&user_id) {
-                    game_info.players.insert(user_id, GamePlayerInfo::default());
+                // TODO: hack_players_mut
+                if let Some(player_info) = game_info.hack_players_mut().get_mut(&user_id) {
+                    if !game_has_started {
+                        // If the game is in lobby phase, just rejoin.
+                        *player_info = GamePlayerInfo::NotInTeam;
+                        self.users.get_mut(&user_id).expect("Should exist").game = Some(game_id);
+                    } else {
+                        match player_info {
+                            GamePlayerInfo::NotInTeam => {
+                                // TODO: force team selection in frontend.
+                                self.send_error(
+                                    id,
+                                    "Game in progress, rejoin team selection not implemented yet",
+                                    ErrorSeverity::Error,
+                                )
+                                .await;
+                                return Err(());
+                            }
+                            GamePlayerInfo::InTeam(team) => {
+                                panic!(
+                                    "Invaraint violation: user {user_id} already in team {team:?} in game {game_id:?}"
+                                );
+                            }
+                            GamePlayerInfo::LeftGame(None) => {
+                                // TODO: force team selection in frontend.
+                                self.send_error(
+                                    id,
+                                    "Game in progress, rejoin team selection not implemented yet",
+                                    ErrorSeverity::Error,
+                                )
+                                .await;
+                                return Err(());
+                            }
+                            GamePlayerInfo::LeftGame(Some(team)) => {
+                                // Rejoin the team.
+                                self.users.get_mut(&user_id).expect("Should exist").game =
+                                    Some(game_id);
+                                *player_info = GamePlayerInfo::InTeam(*team);
+                            }
+                        }
+                    }
+                } else {
+                    game_info.add_player(user_id);
                     self.users.get_mut(&user_id).expect("Should exist").game = Some(game_id);
 
                     // XXX: do we want to keep this? Insert user to the team with the least players?
@@ -367,9 +426,15 @@ impl State {
                     } else {
                         Team::BLACK
                     };
-                    let player_info = game_info.players.get_mut(&user_id).expect("Should exist");
-                    player_info.team = Some(team);
+                    *game_info
+                        .hack_players_mut()
+                        .get_mut(&user_id)
+                        .expect("Should exist") = GamePlayerInfo::InTeam(team);
                 }
+
+                game_info
+                    .global_chat
+                    .push(ChatMessage::system(format!("<{user_id}> joined the lobby")));
 
                 self.broadcast_game_state(game_id).await;
                 Ok(())
@@ -380,8 +445,12 @@ impl State {
 
                 let user_data = self.users.get_mut(&user_id).expect("Should exist");
                 let game_info = self.games.get_mut(&game_id).expect("Should exist");
-                game_info.players.remove(&user_id);
+                game_info.kick_player(user_id);
                 user_data.game = None;
+
+                game_info
+                    .global_chat
+                    .push(ChatMessage::system(format!("<{user_id}> left the lobby")));
 
                 self.broadcast_game_state(game_id).await;
                 self.send_state_to_user(user_id).await;
@@ -392,8 +461,19 @@ impl State {
                 let game_id = self.require_game(id, user_id).await?;
 
                 let game_info = self.games.get_mut(&game_id).expect("Should exist");
-                let player_info = game_info.players.get_mut(&user_id).expect("Should exist");
-                player_info.team = Some(team);
+
+                // TODO: allow joining games if the player has not been in a team yet.
+                if !matches!(game_info.state, GameInfoState::Lobby) {
+                    self.send_error(id, "Cannot change teams while in game", ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                }
+
+                // TODO
+                *game_info
+                    .hack_players_mut()
+                    .get_mut(&user_id)
+                    .expect("Should exist") = GamePlayerInfo::InTeam(team);
                 self.broadcast_game_state(game_id).await;
                 Ok(())
             }
@@ -402,7 +482,7 @@ impl State {
                 let game_id = self.require_game(id, user_id).await?;
 
                 let game_info = self.games.get_mut(&game_id).expect("Should exist");
-                if !game_info.players.contains_key(&kick_user_id) {
+                if !game_info.players().contains_key(&kick_user_id) {
                     self.send_error(id, "User not in game", ErrorSeverity::Info)
                         .await;
                     return Err(());
@@ -420,7 +500,9 @@ impl State {
                     return Err(());
                 }
 
-                game_info.players.remove(&kick_user_id);
+                // Mark player as kicked. If in game, store the team so they must re-join it again if joining later.
+                game_info.kick_player(kick_user_id);
+
                 let kick_user_data = self.users.get_mut(&kick_user_id).expect("Should exist");
                 kick_user_data.game = None;
                 self.broadcast_game_state(game_id).await;
@@ -511,7 +593,7 @@ impl State {
 
                         // Success.
                         game_info.global_chat.push(ChatMessage::system(format!(
-                            "<@{user_id:?}> submitted clues {clues:?}"
+                            "<{user_id}> submitted clues {clues:?}"
                         )));
                         current_round[team].clues = Some(clues);
                         game_info.proceed_if_ready();
@@ -597,7 +679,7 @@ impl State {
 
                         // Success.
                         game_info.global_chat.push(ChatMessage::system(format!(
-                            "<@{user_id:?}> submitted decipher {attempt:?}"
+                            "<{user_id}> submitted decipher {attempt:?}"
                         )));
                         current_round[team].decipher = Some(attempt);
                         game_info.proceed_if_ready();
@@ -673,7 +755,7 @@ impl State {
 
                         // Success.
                         game_info.global_chat.push(ChatMessage::system(format!(
-                            "<@{user_id:?}> submitted intercept {attempt:?}"
+                            "{user_id}> submitted intercept {attempt:?}"
                         )));
                         current_round[team].intercept = Some(attempt);
                         game_info.proceed_if_ready();
@@ -689,6 +771,24 @@ impl State {
                         .await;
                     Err(())
                 }
+            }
+            FromClient::GlobalChat(message) => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                if message.len() >= 4096 {
+                    self.send_error(id, "Message too long", ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                }
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                game_info.global_chat.push(ChatMessage {
+                    author: Some(user_id),
+                    text: message,
+                });
+                self.broadcast_game_state(game_id).await;
+                Ok(())
             }
         }
     }

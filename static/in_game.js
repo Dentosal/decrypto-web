@@ -273,10 +273,12 @@ const renderInterceptionMatrix = (state, team) => {
 
 export default function viewInGame(state) {
     return html`
-    ${renderKeywords(state)}
-    ${renderAction(state)}
-    ${renderInterceptionMatrix(state, false)}
-    ${renderInterceptionMatrix(state, true)}
-    <pre><code>${JSON.stringify(state.game, null, 2)}</code></pre>
+    <div id="in_game" class="column spacer">
+        ${renderKeywords(state)}
+        ${renderAction(state)}
+        ${renderInterceptionMatrix(state, false)}
+        ${renderInterceptionMatrix(state, true)}
+        <pre><code>${JSON.stringify(state.game, null, 2)}</code></pre>
+    <div>
     `;
 }

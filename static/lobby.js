@@ -19,56 +19,58 @@ const renderPlayer = (state, player) => {
 
 export default function viewInGame(state) {
     return html`
-    <h1>
-        Waiting for players to join
-        <input
-            type="button"
-            value="Leave lobby"
-            @click=${() => state.send({ leave_lobby: null })}
-        />
-    </h1>
-    <p>Invite link: <a href="${window.location.origin}/#join_${state.game.id}">${window.location.origin}/#join_${state.game.id}</a></p>
-    <p>
-        <input
-            type="button"
-            value="Start game"
-            ?disabled=${state.game.lobby.reason_not_startable}
-            @click=${() => state.send({ start_game: null })}
-        />
-        ${state.game.lobby.reason_not_startable ? html`(${state.game.lobby.reason_not_startable})` : ''}
-    </p>
-    <h2>Teams</h2>
-    <div id="lobby-teams" class="row">
-        <div>
-            <h3>No team selected</h3>
-            ${state.game.players.filter(p => p.team === null).map(p => renderPlayer(state, p))}
+    <div id="lobby" class="column spacer">
+        <h1>
+            Waiting for players to join
+            <input
+                type="button"
+                value="Leave lobby"
+                @click=${() => state.send({ leave_lobby: null })}
+            />
+        </h1>
+        <p>Invite link: <a href="${window.location.origin}/#join_${state.game.id}">${window.location.origin}/#join_${state.game.id}</a></p>
+        <p>
+            <input
+                type="button"
+                value="Start game"
+                ?disabled=${state.game.lobby.reason_not_startable}
+                @click=${() => state.send({ start_game: null })}
+            />
+            ${state.game.lobby.reason_not_startable ? html`(${state.game.lobby.reason_not_startable})` : ''}
+        </p>
+        <h2>Teams</h2>
+        <div id="lobby-teams" class="row">
+            <div>
+                <h3>No team selected</h3>
+                ${state.game.players.filter(p => p.is_in_game && p.team === null).map(p => renderPlayer(state, p))}
+            </div>
+            <div>
+                <h3>
+                    Team 2
+                    <input
+                        type="button"
+                        value="Join"
+                        @click=${() => state.send({ join_team: false })}
+                    />
+                </h3>
+                ${state.game.players.filter(p => p.is_in_game && p.team === false).map(p => renderPlayer(state, p))}
+            </div>
+            <div>
+                <h3>
+                    Team 2
+                    <input
+                        type="button"
+                        value="Join"
+                        @click=${() => state.send({ join_team: true })}
+                    />
+                </h3>
+                ${state.game.players.filter(p => p.is_in_game && p.team === true).map(p => renderPlayer(state, p))}
+            </div>
         </div>
-        <div>
-            <h3>
-                Team 2
-                <input
-                    type="button"
-                    value="Join"
-                    @click=${() => state.send({ join_team: 0 })}
-                />
-            </h3>
-            ${state.game.players.filter(p => p.team === false).map(p => renderPlayer(state, p))}
-        </div>
-        <div>
-            <h3>
-                Team 2
-                <input
-                    type="button"
-                    value="Join"
-                    @click=${() => state.send({ join_team: 1 })}
-                />
-            </h3>
-            ${state.game.players.filter(p => p.team === true).map(p => renderPlayer(state, p))}
-        </div>
+        <h2>Settings</h2>
+        TODO: settings editor
+        <pre><code>${JSON.stringify(state.game.settings, null, 2)}</code></pre>
+        TODO: custom wordlists
     </div>
-    <h2>Settings</h2>
-    TODO: settings editor
-    <pre><code>${JSON.stringify(state.game.settings, null, 2)}</code></pre>
-    TODO: custom wordlists
     `;
 }
