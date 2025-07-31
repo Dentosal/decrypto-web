@@ -21,6 +21,10 @@ pub struct GameSettings {
     pub clue_mode: ClueMode,
     /// Keyword list to use for the game.
     pub keyword_list: KeywordList,
+    /// Miscommunication limit before losing, default 2.
+    pub miscommunication_limit: usize,
+    /// Intercept limit before winning, default 2.
+    pub intercept_limit: usize,
     /// Timer for encryptors to encrypt clues.
     pub encrypt_time_limit: EncryptTimeLimit,
     /// Time to decide intercept attempt.
@@ -36,6 +40,8 @@ impl Default for GameSettings {
             clue_count: 3,
             clue_mode: Default::default(),
             keyword_list: Default::default(),
+            miscommunication_limit: 2,
+            intercept_limit: 2,
             encrypt_time_limit: Default::default(),
             intercept_time_limit: Default::default(),
             decipher_time_limit: Default::default(),

@@ -603,7 +603,11 @@ impl State {
                             "<{user_id}> submitted clues {clues:?}"
                         )));
                         current_round[team].clues = Some(clues);
-                        game_info.proceed_if_ready();
+                        if let Some(result) = game_info.proceed_if_ready() {
+                            game_info.global_chat.push(ChatMessage::system(format!(
+                                "Round ended, scores: {result}"
+                            )));
+                        }
                         self.broadcast_game_state(game_id).await;
                         Ok(())
                     } else {
@@ -689,7 +693,11 @@ impl State {
                             "<{user_id}> submitted decipher {attempt}"
                         )));
                         current_round[team].decipher = Some(attempt);
-                        game_info.proceed_if_ready();
+                        if let Some(result) = game_info.proceed_if_ready() {
+                            game_info.global_chat.push(ChatMessage::system(format!(
+                                "Round ended, scores: {result}"
+                            )));
+                        }
                         self.broadcast_game_state(game_id).await;
                         Ok(())
                     } else {
@@ -765,7 +773,11 @@ impl State {
                             "<{user_id}> submitted intercept {attempt}"
                         )));
                         current_round[team].intercept = Some(attempt);
-                        game_info.proceed_if_ready();
+                        if let Some(result) = game_info.proceed_if_ready() {
+                            game_info.global_chat.push(ChatMessage::system(format!(
+                                "Round ended, scores: {result}"
+                            )));
+                        }
                         self.broadcast_game_state(game_id).await;
                         Ok(())
                     } else {

@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt,
     ops::{Index, IndexMut},
 };
 
@@ -42,6 +43,37 @@ impl Team {
 pub enum Role {
     Encryptor,
     Decryptor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct RoundResult {
+    pub intercept: Option<bool>,
+    pub miscommunication: bool,
+}
+
+impl fmt::Display for RoundResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "decipher {}",
+            if !self.miscommunication {
+                "ok"
+            } else {
+                "failed"
+            }
+        )?;
+
+        if let Some(intercept) = self.intercept {
+            if intercept {
+                write!(f, ", intercept successful")
+            } else {
+                write!(f, ", failed to intercept")
+            }
+        } else {
+            write!(f, "")
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -151,7 +183,8 @@ impl GameInfo {
         };
     }
 
-    pub fn proceed_if_ready(&mut self) {
+    #[must_use]
+    pub fn proceed_if_ready(&mut self) -> Option<PerTeam<RoundResult>> {
         let GameInfoState::InGame {
             completed_rounds,
             current_round,
@@ -159,7 +192,7 @@ impl GameInfo {
             ..
         } = &mut self.state
         else {
-            return;
+            return None;
         };
 
         // TODO
@@ -189,7 +222,7 @@ impl GameInfo {
                             Phase::Intercept(Team::BLACK)
                         };
                     } else {
-                        self.next_round();
+                        return Some(self.next_round());
                     }
                 }
             }
@@ -201,9 +234,11 @@ impl GameInfo {
             }
             _ => {}
         }
+        None
     }
 
-    fn next_round(&mut self) {
+    #[must_use]
+    fn next_round(&mut self) -> PerTeam<RoundResult> {
         let players_in_teams = PerTeam::from(Team::ORDER.map(|team| self.players_in_team(team)));
         let GameInfoState::InGame {
             completed_rounds,
@@ -220,6 +255,7 @@ impl GameInfo {
             .take()
             .expect("Cannot proceed to next round without current round");
         completed_rounds.push(ended_round.clone());
+        let score = ended_round.score();
         *phase = Phase::Encrypt;
         *current_round = Some(Round::from(Team::ORDER.map(|team| {
             // Pick a the next encryptor for the team.
@@ -238,6 +274,8 @@ impl GameInfo {
                 intercept: None,
             }
         })));
+
+        score
     }
 }
 
@@ -317,6 +355,41 @@ impl<T> IndexMut<Team> for PerTeam<T> {
 }
 
 pub type Round = PerTeam<RoundPerTeam>;
+
+impl PerTeam<RoundPerTeam> {
+    fn score(&self) -> PerTeam<RoundResult> {
+        PerTeam(Team::ORDER.map(|team| {
+            let miscommunication = match self[team].decipher.as_ref() {
+                Some(attempt) => *attempt != self[team].code,
+                None => true,
+            };
+
+            let intercept = match self[team].intercept.as_ref() {
+                Some(attempt) => Some(*attempt == self[team.other()].code),
+                None => None,
+            };
+
+            RoundResult {
+                intercept,
+                miscommunication,
+            }
+        }))
+    }
+}
+
+impl<T> fmt::Display for PerTeam<T>
+where
+    T: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Team 1: {} - Team 2: {}",
+            self[Team::WHITE],
+            self[Team::BLACK]
+        )
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
