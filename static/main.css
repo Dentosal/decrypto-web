@@ -1,3 +1,9 @@
+:root {
+    --tint-my-team: #efe;
+    --tint-other-team: #fee;
+    --tint-neutral: #eee;
+}
+
 div {
     box-sizing: border-box;
 }
@@ -66,6 +72,13 @@ body {
     padding: 0;
 }
 
+#app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
 #topbar {
     display: flex;
     flex-direction: row;
@@ -83,11 +96,14 @@ body {
 }
 
 .sidebar-split {
+    flex: 1;
     display: flex;
     flex-direction: row;
     justify-content: space-between;
     flex-wrap: wrap;
     width: 100%;
+    height: 100%;
+    overflow-y: scroll;
 }
 
 @media only screen and (min-width: 800px) {
@@ -201,33 +217,39 @@ body {
 }
 
 .history {
-    border-collapse: collapse;
-    overflow: scroll;
+    max-height: 30vh;
+    overflow: auto;
+}
+.history table {
+    border-collapse: separate;
+    border-spacing: 0;;
     border-radius: 5px;
     text-align: center;
-    border: 2px solid black
+    width: 100%;
+}
+.history thead {
+    background-color: white;
+}
+.history thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 .history th, .history td {
     border: 1px solid black;
 }
-.history tbody tr {
-    border-top: 2px solid black
-}
 .col-round {
-    background-color: #ccc;
-}
-.col-your-team {
-    border: 2px solid black;
-}
-.col-other-team {
-    border: 2px solid black;
+    background-color: var(--tint-neutral);
 }
 
+.tint-neutral {
+    background-color: var(--tint-neutral);
+}
 .tint-my-team {
-    background-color: #efe;
+    background-color: var(--tint-my-team);
 }
 .tint-other-team {
-    background-color: #fee;
+    background-color: var(--tint-other-team);
 }
 
 span[x-hl] {

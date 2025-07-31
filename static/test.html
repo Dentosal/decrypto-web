@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Sticky Header Table</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 2rem;
+        }
+
+        .table-container {
+            max-height: 25vh;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            border-bottom: 2px solid #ccc;
+            padding: 0.5rem;
+            text-align: left;
+            z-index: 1;
+        }
+
+        tbody td {
+            padding: 0.5rem;
+            border: 1px solid black;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Occupation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Sample rows -->
+                <tr>
+                    <td>Alice</td>
+                    <td>30</td>
+                    <td>Engineer</td>
+                </tr>
+                <tr>
+                    <td>Bob</td>
+                    <td>25</td>
+                    <td>Designer</td>
+                </tr>
+                <tr>
+                    <td>Charlie</td>
+                    <td>35</td>
+                    <td>Manager</td>
+                </tr>
+                <tr>
+                    <td>Denise</td>
+                    <td>29</td>
+                    <td>Developer</td>
+                </tr>
+                <tr>
+                    <td>Evan</td>
+                    <td>31</td>
+                    <td>Analyst</td>
+                </tr>
+                <tr>
+                    <td>Fay</td>
+                    <td>28</td>
+                    <td>Writer</td>
+                </tr>
+                <tr>
+                    <td>George</td>
+                    <td>33</td>
+                    <td>Architect</td>
+                </tr>
+                <tr>
+                    <td>Hannah</td>
+                    <td>27</td>
+                    <td>Marketer</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</body>
+
+</html>

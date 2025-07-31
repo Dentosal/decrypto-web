@@ -246,10 +246,8 @@ const renderAction = (state) => {
 }
 
 const renderInterceptionMatrix = (state, team) => {
-    let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
-
     return html`
-    <table class="matrix ${team == myTeam ? 'tint-my-team' : 'tint-other-team'}">
+    <table class="matrix">
         <colgroup>
             <col class="col-round"/>
             <col span="${state.game.settings.keyword_count}" class="col-clue"/>
@@ -287,7 +285,8 @@ const renderRoundHistory = state => {
     let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
 
     return html`
-    <table class="history">
+    <div class="history">
+    <table>
         <colgroup>
             <col class="col-round" />
             <col span="5" class="col-team col-your-team tint-my-team" />
@@ -295,21 +294,21 @@ const renderRoundHistory = state => {
         </colgroup>
         <thead>
             <tr>
-                <th rowspan="2">Round</th>
-                <th colspan="5">Your team</th>
-                <th colspan="5">Other team</th>
+                <th rowspan="2" class="tint-neutralm">Round</th>
+                <th colspan="5" class="tint-my-team">Your team</th>
+                <th colspan="5" class="tint-other-team">Other team</th>
             </tr>
             <tr>
-                <th>Encryptor</th>
-                <th>Code</th>
-                <th>Clues</th>
-                <th>Decipher</th>
-                <th>Intercept</th>
-                <th>Encryptor</th>
-                <th>Code</th>
-                <th>Clues</th>
-                <th>Decipher</th>
-                <th>Intercept</th>
+                <th class="tint-my-team">Encryptor</th>
+                <th class="tint-my-team">Code</th>
+                <th class="tint-my-team">Clues</th>
+                <th class="tint-my-team">Decipher</th>
+                <th class="tint-my-team">Intercept</th>
+                <th class="tint-other-team">Encryptor</th>
+                <th class="tint-other-team">Code</th>
+                <th class="tint-other-team">Clues</th>
+                <th class="tint-other-team">Decipher</th>
+                <th class="tint-other-team">Intercept</th>
             </tr>
         </thead>
         <tbody>
@@ -371,16 +370,19 @@ const renderRoundHistory = state => {
             </tr>
         </tbody>
     </table>
+    </div>
     `;
 }
 
 export default function viewInGame(state) {
+    let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
+
     return html`
     <div id="in_game">
         ${renderKeywords(state)}
         ${renderAction(state)}
-        ${renderInterceptionMatrix(state, false)}
-        ${renderInterceptionMatrix(state, true)}
+        <div class="spacer"></div>
+        ${renderInterceptionMatrix(state, !myTeam)}
         ${renderRoundHistory(state)}
     <div>
     `;

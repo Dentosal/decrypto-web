@@ -26,6 +26,19 @@ const connect = () => {
         // send({ auth: { secret: localStorage.getItem('secret') || null } });
         send({ auth: { secret: null } }); // xxx
     });
+    state.ws.addEventListener('error', e => {
+        console.error("WebSocket error:", e);
+        document.getElementById('error').innerText = e.message;
+        document.getElementById('error').classList.remove("severity-info");
+        document.getElementById('error').classList.remove("severity-warning");
+        document.getElementById('error').classList.add("severity-error");
+    });
+    state.ws.addEventListener('close', e => {
+        document.getElementById('error').innerText = "Server closed connection unexpectedly " + e.reason;
+        document.getElementById('error').classList.remove("severity-info");
+        document.getElementById('error').classList.remove("severity-warning");
+        document.getElementById('error').classList.add("severity-error");
+    });
 };
 
 const onMessage = event => {
