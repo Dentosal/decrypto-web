@@ -11,8 +11,8 @@ use crate::{
     },
     id::{ConnectionId, GameId, UserId, UserSecret},
     message::{
-        ChatMessage, CurrentRoundPerTeam, ErrorSeverity, FromClient, GameStateView, GameView,
-        Inputs, PlayerInfo, ToClient, UserInfo,
+        ChatMessage, CompletedRoundPerTeam, CurrentRoundPerTeam, ErrorSeverity, FromClient,
+        GameStateView, GameView, Inputs, PlayerInfo, ToClient, UserInfo,
     },
 };
 
@@ -170,7 +170,16 @@ impl State {
 
                         GameStateView::InGame {
                             keywords: team_info.keywords.clone(),
-                            completed_rounds: completed_rounds.clone(),
+                            completed_rounds: completed_rounds
+                                .iter()
+                                .map(|round| {
+                                    let score = round.score();
+                                    PerTeam::from_fn(|t| CompletedRoundPerTeam {
+                                        non_computed: round[t].clone(),
+                                        score: score[t],
+                                    })
+                                })
+                                .collect(),
                             current_round: current_round.as_ref().map(|round| {
                                 PerTeam::from_fn(|t| CurrentRoundPerTeam {
                                     encryptor: round[t].encryptor,
@@ -681,7 +690,7 @@ impl State {
                         current_round[team].decipher = Some(attempt);
                         if let Some(result) = game_info.next_round_if_ready() {
                             game_info.global_chat.push(ChatMessage::system(format!(
-                                "Round ended, scores: {result}"
+                                "Round ended, scores:\n{result}"
                             )));
                         }
                         self.broadcast_game_state(game_id).await;
@@ -748,7 +757,7 @@ impl State {
                         current_round[team].intercept = Some(attempt);
                         if let Some(result) = game_info.next_round_if_ready() {
                             game_info.global_chat.push(ChatMessage::system(format!(
-                                "Round ended, scores: {result}"
+                                "Round ended, scores:\n{result}"
                             )));
                         }
                         self.broadcast_game_state(game_id).await;

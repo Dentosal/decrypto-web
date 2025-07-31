@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    decrypto::{Code, PerTeam, Role, Round, Team, settings::GameSettings},
+    decrypto::{
+        Code, PerTeam, Role, Round, RoundPerTeam, RoundResult, Team, settings::GameSettings,
+    },
     id::{GameId, UserId, UserSecret},
 };
 
@@ -81,7 +83,7 @@ pub enum GameStateView {
     },
     InGame {
         /// Complete rounds (public info).
-        completed_rounds: Vec<Round>,
+        completed_rounds: Vec<PerTeam<CompletedRoundPerTeam>>,
         /// Current round (public info).
         current_round: Option<PerTeam<CurrentRoundPerTeam>>,
         /// Keywords for this team (private info).
@@ -91,6 +93,15 @@ pub enum GameStateView {
     },
     /// The game is in progress, but you're not in a team.
     InGameNotInTeam,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct CompletedRoundPerTeam {
+    /// All non-computed properties. Rest are derived from it.
+    #[serde(flatten)]
+    pub non_computed: RoundPerTeam,
+    pub score: RoundResult,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

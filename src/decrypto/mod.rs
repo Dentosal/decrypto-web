@@ -49,7 +49,7 @@ pub enum Role {
 #[serde(rename_all = "snake_case")]
 pub struct RoundResult {
     pub intercept: Option<bool>,
-    pub miscommunication: bool,
+    pub decipher: bool,
 }
 
 impl fmt::Display for RoundResult {
@@ -57,11 +57,7 @@ impl fmt::Display for RoundResult {
         write!(
             f,
             "decipher {}",
-            if !self.miscommunication {
-                "ok"
-            } else {
-                "failed"
-            }
+            if self.decipher { "ok" } else { "failed" }
         )?;
 
         if let Some(intercept) = self.intercept {
@@ -329,10 +325,10 @@ impl<T> IndexMut<Team> for PerTeam<T> {
 pub type Round = PerTeam<RoundPerTeam>;
 
 impl PerTeam<RoundPerTeam> {
-    fn score(&self) -> PerTeam<RoundResult> {
+    pub fn score(&self) -> PerTeam<RoundResult> {
         PerTeam(Team::ORDER.map(|team| {
-            let miscommunication = match self[team].decipher.as_ref() {
-                Some(attempt) => *attempt != self[team].code,
+            let decipher = match self[team].decipher.as_ref() {
+                Some(attempt) => *attempt == self[team].code,
                 None => true,
             };
 
@@ -343,7 +339,7 @@ impl PerTeam<RoundPerTeam> {
 
             RoundResult {
                 intercept,
-                miscommunication,
+                decipher,
             }
         }))
     }
@@ -356,7 +352,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Team 1: {} - Team 2: {}",
+            "Team 1: {}\nTeam 2: {}",
             self[Team::WHITE],
             self[Team::BLACK]
         )

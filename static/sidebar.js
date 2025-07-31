@@ -1,4 +1,5 @@
 import { html } from 'https://unpkg.com/lit-html?module';
+import semantic from './semantic.js';
 
 const kickButton = (state, playerId) => {
     return html`
@@ -11,8 +12,7 @@ const kickButton = (state, playerId) => {
 const renderPlayer = (state, player) => {
     return html`
         <div class="player">
-            <span class="nick">${player.nick}</span>
-            <span class="team">${player.team === null ? "Not in a team" : "Team " + (player.team + 1)}</span>
+            <span class="nick">${semantic.player(state, player.id)}</span>
             ${player.connected ? null : ["(disconnected", kickButton(state, player.id), ")"]}
         </div>
     `;
@@ -29,9 +29,13 @@ const renderPlayerList = state => {
 const renderChatMessage = (state, msg) => {
     // Parse tag syntax like <@user_id>
     let tags = [];
-    let text = msg.text.replace(/<(.+?)>/g, (match, tag) => {
+    let text = msg.text.replace(/<(.+?)>|\n/g, (match, tag) => {
         let i = tags.length;
-        tags.push(tag);
+        if (match === '\n') {
+            tags.push("br");
+        } else {
+            tags.push(tag);
+        }
         return "<" + i + ">";
     });
     text = text.split(/<.+?>/g);
@@ -41,8 +45,11 @@ const renderChatMessage = (state, msg) => {
         if (m) {
             let player = state.game.players.find(p => p.id === m[1]);
             if (player) {
-                return html`<span class="mention" x-mention=${player.id}>${player.nick}</span>`;
+                return semantic.player(state, player.id);
             }
+        }
+        if (tag == "br" || tag == "\n") {
+            return html`<br>`;
         }
         return "<" + tag + ">"; // Note: this is not html, but a string literal
     });
@@ -60,7 +67,7 @@ const renderChatMessage = (state, msg) => {
     return html`
     <div class="chat-message row ${msg.author === null ? 'system-msg' : 'user-msg'}">
         <span class="author">
-            ${msg.author === null ? 'system' : state.game.players.find(p => p.id === msg.author).nick}
+            ${msg.author === null ? '' : state.game.players.find(p => p.id === msg.author).nick}
         </span>
         <span class="content">
             ${rendered}

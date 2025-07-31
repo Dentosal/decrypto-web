@@ -78,6 +78,8 @@ body {
 #sidebar {
     min-width: 350px;
     gap: 0;
+    background-color: #eee;
+    max-width: fit-content;
 }
 
 .sidebar-split {
@@ -88,14 +90,21 @@ body {
     width: 100%;
 }
 
+@media only screen and (min-width: 800px) {
+    .sidebar-split {
+        flex-wrap: nowrap;
+    }
+}
+
 #welcome, #lobby, #in_game {
     padding: 10px;
 }
 
 #lobby, #in_game {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: space-around;
+    justify-content: flex-start;
     gap: 10px;
 }
 
@@ -104,11 +113,6 @@ body {
     border: 1px solid #ccc;
     flex: 1;
     min-width: 350px;
-}
-
-#sidebar {
-    background-color: #eee;
-    max-width: fit-content;
 }
 
 .global-chat {
@@ -134,17 +138,11 @@ body {
     max-width: 500px;
 }
 
-.chat-message .mention {
-    background-color: #aaa;
-    border-radius: 5px;
-    padding: 2px 5px;
-}
-
 .chat-message .author {
     font-weight: bold;
 }
 
-.system-msg > .author {
+.system-msg {
     font-style: italic;
 }
 
@@ -160,17 +158,29 @@ body {
     padding: 5px 10px;
 }
 
-.history {
+.keywords {
+    background-color: #eee;
+    border-radius: 10px;
+    padding: 10px;
+}
+.keywords .keyword {
+    background-color: #efe;
+    border-radius: 5px;
+    padding: 5px;
+    font-weight: bold;
+}
+
+.matrix {
     border-collapse: collapse;
     width: 100%;
     overflow: scroll;
 }
 
-.history th, .history td {
+.matrix th, .matrix td {
     border: 1px solid black;
 }
 
-.history td {
+.matrix td {
     padding: 5px
 }
 
@@ -178,4 +188,53 @@ body {
     min-width: 120px;
     max-width: 20vw;
     overflow-x: scroll;
+}
+
+.input-action {
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+}
+.input-action h1 {
+    margin: 0;
+    font-size: 1.2em;
+}
+
+.history {
+    border-collapse: collapse;
+    overflow: scroll;
+    border-radius: 5px;
+    text-align: center;
+    border: 2px solid black
+}
+.history th, .history td {
+    border: 1px solid black;
+}
+.history tbody tr {
+    border-top: 2px solid black
+}
+.col-round {
+    background-color: #ccc;
+}
+.col-your-team {
+    border: 2px solid black;
+}
+.col-other-team {
+    border: 2px solid black;
+}
+
+.tint-my-team {
+    background-color: #efe;
+}
+.tint-other-team {
+    background-color: #fee;
+}
+
+span[x-hl] {
+    border-radius: 3px;
+    background-color: rgba(230, 240, 230, 0.5);
+    transition: background-color 250ms linear;
+}
+span[x-hl].highlight {
+    background-color: rgba(255, 255, 230, 0.9);
 }

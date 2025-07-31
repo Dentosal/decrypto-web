@@ -1,10 +1,12 @@
 import { html } from 'https://unpkg.com/lit-html?module';
+import semantic from './semantic.js';
 
 const renderKeywords = (state) => {
     return html`
     <div class="row keywords">
+        Team keywords:
         ${state.game.in_game.keywords.map((keyword, index) => html`
-            <div class="keyword">${index + 1}. ${keyword}</div>
+            <div>${index + 1}. <span class="keyword">${keyword}</span></div>
         `)}
     </div>`;
 }
@@ -33,7 +35,7 @@ const renderClueInput = (state, idx) => {
 
     return html`
     <tr>
-        <td>${idx + 1}</td>
+        <td>${idx + 1}.</td>
         <td>${state.game.in_game.keywords[idx]}</td>
         <td>${input}</td>
     </tr>
@@ -117,8 +119,8 @@ const renderDecipher = (state) => {
     };
 
     return html`
-    <div>
-        <p>Attempt to decipher your clues:</p>
+    <div class="input-action">
+        <h1>Attempt to decipher your clues:</h1>
         <ul>
             ${state.game.in_game.current_round[+myTeam].clues.map(clue => html`<li>${renderClue(state, clue)}</li>`)}
         </ul>
@@ -151,8 +153,8 @@ const renderIntercept = (state) => {
     };
 
     return html`
-        <div>
-            <p>Attempt interception:</p>
+        <div class="input-action">
+            <h1>Attempt interception:</h1>
             <ul>
                 ${state.game.in_game.current_round[+!myTeam].clues.map(clue => html`<li>${renderClue(state, clue)}</li>`)}
             </ul>
@@ -186,12 +188,12 @@ const renderAction = (state) => {
     if ('encrypt' in state.game.in_game.inputs) {
         let code = state.game.in_game.inputs.encrypt;
         return html`
-        <div>
-            <p>It's your turn to give clues!</p>
+        <div class="input-action">
+            <h1>It's your turn to give clues!</h1>
             <div>
             Code: ${code.map((num) => num + 1).join('-')} (for ${code.map((num) => state.game.in_game.keywords[num]).join(', ')})
             </div>
-            <table>
+            <table class="clue-inputs">
                 ${code.map(num => renderClueInput(state, num))}
             </table>
             <input
@@ -212,25 +214,31 @@ const renderAction = (state) => {
         let waitingFor = state.game.in_game.inputs.waiting_for_encryptors;
         let ourEncryptor = state.game.in_game.current_round[+myTeam].encryptor;
         let theirEncryptor = state.game.in_game.current_round[+!myTeam].encryptor;
-        let ourEncryptorName = state.game.players.find(p => p.id === ourEncryptor)?.nick;
-        let theirEncryptorName = state.game.players.find(p => p.id === theirEncryptor)?.nick;
-        let ourMention = html`<span x-mention="${ourEncryptor}">${ourEncryptorName}</span>`;
-        let theirMention = html`<span x-mention="${theirEncryptor}">${theirEncryptorName}</span>`;
         if (waitingFor[+myTeam] && waitingFor[+!myTeam]) {
-            return html`<p>Waiting for both teams to finish encrypting (${ourMention}, ${theirMention})...</p>`;
+            return html`
+            <div class="input-action"><h1>
+                Waiting for both teams to finish encrypting
+                (${semantic.player(state, ourEncryptor)}, ${semantic.player(state, theirEncryptor) })...
+            </h1></div>`;
         } else if (waitingFor[+myTeam]) {
-            return html`<p>Waiting for your team to finish encrypting (${ourMention})...</p>`;
+            return html`<div class="input-action"><h1>
+                Waiting for your team to finish encrypting
+                (${semantic.player(state, ourEncryptor)})...
+            </h1></div>`;
         } else {
-            return html`<p>Waiting for the other team to finish encrypting (${theirMention})...</p>`;
+            return html`<div class="input-action"><h1>
+                Waiting for the other team to finish encrypting
+                (${semantic.player(state, theirEncryptor)})...
+            </h1></div>`;
         }
     } else if ('waiting_for_guessers' in state.game.in_game.inputs) {
         let waitingFor = state.game.in_game.inputs.waiting_for_guessers;
         if (waitingFor[+myTeam] && waitingFor[+!myTeam]) {
-            return html`<p>Waiting for both teams to finish guessing...</p>`;
+            return html`<div class="input-action"><h1>Waiting for both teams to finish guessing...</h1></div>`;
         } else if (waitingFor[+myTeam]) {
-            return html`<p>Waiting for your team to finish guessing...</p>`;
+            return html`<div class="input-action"><h1>Waiting for your team to finish guessing...</h1></div>`;
         } else {
-            return html`<p>Waiting for the other team to finish guessing...</p>`;
+            return html`<div class="input-action"><h1>Waiting for the other team to finish guessing...</h1></div>`;
         }
     } else {
         return html`Error: unknown game state ???`;
@@ -238,23 +246,22 @@ const renderAction = (state) => {
 }
 
 const renderInterceptionMatrix = (state, team) => {
+    let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
+
     return html`
-    <table class="history">
+    <table class="matrix ${team == myTeam ? 'tint-my-team' : 'tint-other-team'}">
         <colgroup>
             <col class="col-round"/>
-            <col class="col-encryptor"/>
             <col span="${state.game.settings.keyword_count}" class="col-clue"/>
         </colgroup>
         <thead>
             <th>Round</th>
-            <th>Encryptor</th>
             ${Array(state.game.settings.keyword_count).keys().map(i => html`<th>${i + 1}</th>`)}
         </thead>
         <tbody>
             ${state.game.in_game.completed_rounds.map((round, index) => html`
                 <tr>
-                    <td>${index + 1}</td>
-                    <td>${state.game.players.find(p => p.id == round[+team].encryptor).nick}</td>
+                    <td>${semantic.round(state, index)}</td>
                     ${Array(state.game.settings.keyword_count).keys().map(i => {
                         if (!round[+team].clues) {
                             return html`<td>?</td>`;
@@ -276,6 +283,96 @@ const renderInterceptionMatrix = (state, team) => {
     `;
 }
 
+const renderRoundHistory = state => {
+    let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
+
+    return html`
+    <table class="history">
+        <colgroup>
+            <col class="col-round" />
+            <col span="5" class="col-team col-your-team tint-my-team" />
+            <col span="5" class="col-team col-other-team tint-other-team" />
+        </colgroup>
+        <thead>
+            <tr>
+                <th rowspan="2">Round</th>
+                <th colspan="5">Your team</th>
+                <th colspan="5">Other team</th>
+            </tr>
+            <tr>
+                <th>Encryptor</th>
+                <th>Code</th>
+                <th>Clues</th>
+                <th>Decipher</th>
+                <th>Intercept</th>
+                <th>Encryptor</th>
+                <th>Code</th>
+                <th>Clues</th>
+                <th>Decipher</th>
+                <th>Intercept</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${state.game.in_game.completed_rounds.map((round, index) => html`
+                <tr>
+                    <td>${semantic.round(state, index)}</td>
+                    <td>${semantic.player(state, round[+myTeam].encryptor)}</td>
+                    <td>${semantic.code(state, round[+myTeam].code, myTeam)}</td>
+                    <td><div class="clues column">
+                        ${round[+myTeam].clues.map(clue => renderClue(state, clue))}
+                    </div></td>
+                    <td>
+                        ${semantic.code(state, round[+myTeam].decipher, myTeam)}
+                        <hr>
+                        ${semantic.result(state, round[+!myTeam].score.decipher)}
+                    </td>
+                    <td>
+                        ${semantic.code(state, round[+myTeam].intercept, myTeam)}
+                        <hr>
+                        ${semantic.result(state, round[+myTeam].score.intercept)}
+                    </td>
+                    <td>${semantic.player(state, round[+!myTeam].encryptor)}</td>
+                    <td>${semantic.code(state, round[+!myTeam].code, !myTeam)}</td>
+                    <td><div class="clues column">
+                        ${round[+!myTeam].clues.map(clue => renderClue(state, clue))}
+                    </div></td>
+                    <td>
+                        ${semantic.code(state, round[+!myTeam].decipher, !myTeam)}
+                        <hr>
+                        ${semantic.result(state, round[+!!myTeam].score.decipher)}
+                    </td>
+                    <td>
+                        ${semantic.code(state, round[+!myTeam].intercept, !myTeam)}
+                        <hr>
+                        ${semantic.result(state, round[+!myTeam].score.intercept)}
+                    </td>
+                </tr>
+            `)}
+            <tr>
+                <td>${semantic.round(state, state.game.in_game.completed_rounds.length)}</td>
+                <td>${semantic.player(state, state.game.in_game.current_round[+myTeam].encryptor)}</td>
+                <td>?</td>
+                <td><div class="clues column">
+                    ${state.game.in_game.current_round[+myTeam].clues?.map(clue =>
+                        renderClue(state, clue)
+                    )}
+                </div></td>
+                <td></td>
+                <td></td>
+                <td>${semantic.player(state, state.game.in_game.current_round[+!myTeam].encryptor)}</td>
+                <td>?</td>
+                <td><div class="clues column">
+                    ${state.game.in_game.current_round[+!myTeam].clues?.map(clue =>
+                        renderClue(state, clue)
+                    )}
+                </div></td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+    `;
+}
 
 export default function viewInGame(state) {
     return html`
@@ -284,7 +381,7 @@ export default function viewInGame(state) {
         ${renderAction(state)}
         ${renderInterceptionMatrix(state, false)}
         ${renderInterceptionMatrix(state, true)}
-        <pre><code>${JSON.stringify(state.game, null, 2)}</code></pre>
+        ${renderRoundHistory(state)}
     <div>
     `;
 }

@@ -1,4 +1,5 @@
 import { html } from 'https://unpkg.com/lit-html?module';
+import semantic from './semantic.js';
 
 const kickButton = (state, playerId) => {
     return html`
@@ -11,7 +12,7 @@ const kickButton = (state, playerId) => {
 const renderPlayer = (state, player) => {
     return html`
         <div class="player">
-            <span class="nick">${player.nick}</span>
+            ${semantic.player(state, player.id)}
             ${player.connected ? null : ["(disconnected", kickButton(state, player.id), ")"]}
         </div>
     `;
