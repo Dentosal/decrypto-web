@@ -63,7 +63,7 @@ const submitClues = (state) => {
 
     console.log("Submitting clues:", data);
     if (data.length === 0) { // XXX: dev mode: submit keywords as clues
-        for (let code_part of state.game.in_game.current_round.code) {
+        for (let code_part of state.game.in_game.code) {
             data.push({text : state.game.in_game.keywords[code_part]});
         }
         console.warn("Clues empty, submitting keywords instead:", data);
@@ -90,7 +90,7 @@ const parseGuess = (state, guess) => {
     let result = [];
     for (let i = 0; i < parts.length; i += 1) {
         let num = parseInt(parts[i], 10);
-        if (isNaN(num) || num < 1 || num > state.game.settings.clue_count) {
+        if (isNaN(num) || num < 1 || num > state.game.settings.keyword_count) {
             return null; // Invalid guess
         }
         result.push(num - 1); // Convert to zero-based index
@@ -114,22 +114,23 @@ const renderAction = (state) => {
     };
 
     let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
-    let isEncryptor = !!state.game.in_game.current_round.code;
+    let isEncryptor = !!state.game.in_game.code;
     
     if (state.game.in_game.phase === 'encrypt') {
-        let is_submitted = state.game.in_game.current_round.clues !== null;
+        let is_submitted = state.game.in_game.current_round[+myTeam].clues !== null;
         if (!is_submitted) {
             if (!isEncryptor) {
                 return html`
                 <div>
                     Waiting for
-                    ${state.game.players.find(p => p.id === state.game.in_game.current_round.encryptor).nick}
+                    ${state.game.players.find(p => p.id === state.game.in_game.current_round[+myTeam].encryptor).nick}
                     to give clues...
                 </div>`;
             }
-            let code = state.game.in_game.current_round.code;
+            let code = state.game.in_game.code;
             return html`
             <div>
+                <p>It's your turn to give clues!</p>
                 <div>
                 Code: ${code.map((num) => num + 1).join('-')} (for ${code.map((num) => state.game.in_game.keywords[num]).join(', ')})
                 </div>
@@ -174,7 +175,10 @@ const renderAction = (state) => {
 
         return html`
         <div>
-            Attempt interception:
+            <p>Attempt interception:</p>
+            <ul>
+                ${state.game.in_game.current_round[+!myTeam].clues.map(clue => html`<li>${renderClue(state, clue)}</li>`)}
+            </ul>
             <input
                 type="text"
                 placeholder="${[...Array(state.game.settings.clue_count).keys().map(i => i + 1)].join('-')}"
@@ -219,7 +223,10 @@ const renderAction = (state) => {
 
         return html`
         <div>
-            Attempt to decipher your clues:
+            <p>Attempt to decipher your clues:</p>
+            <ul>
+                ${state.game.in_game.current_round[+myTeam].clues.map(clue => html`<li>${renderClue(state, clue)}</li>`)}
+            </ul>
             <input
                 type="text"
                 placeholder="${[...Array(state.game.settings.clue_count).keys().map(i => i + 1)].join('-')}"
@@ -239,6 +246,11 @@ const renderAction = (state) => {
 const renderInterceptionMatrix = (state, team) => {
     return html`
     <table class="history">
+        <colgroup>
+            <col class="col-round"/>
+            <col class="col-encryptor"/>
+            <col span="${state.game.settings.keyword_count}" class="col-clue"/>
+        </colgroup>
         <thead>
             <th>Round</th>
             <th>Encryptor</th>
@@ -273,7 +285,7 @@ const renderInterceptionMatrix = (state, team) => {
 
 export default function viewInGame(state) {
     return html`
-    <div id="in_game" class="column spacer">
+    <div id="in_game">
         ${renderKeywords(state)}
         ${renderAction(state)}
         ${renderInterceptionMatrix(state, false)}

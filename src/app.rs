@@ -11,8 +11,8 @@ use crate::{
     },
     id::{ConnectionId, GameId, UserId, UserSecret},
     message::{
-        ChatMessage, CurrentRound, ErrorSeverity, FromClient, GameStateView, GameView, PlayerInfo,
-        ToClient, UserInfo,
+        ChatMessage, CurrentRoundPerTeam, ErrorSeverity, FromClient, GameStateView, GameView,
+        PlayerInfo, ToClient, UserInfo,
     },
 };
 
@@ -169,24 +169,27 @@ impl State {
                     if let Some(team) = game_info.team_for_user(user_id) {
                         let team_info = &teams[team.index()];
 
+                        let code = current_round.as_ref().and_then(|per_team| {
+                            if per_team[team].encryptor == user_id {
+                                Some(per_team[team].code.clone())
+                            } else {
+                                None
+                            }
+                        });
+
                         GameStateView::InGame {
                             keywords: team_info.keywords.clone(),
                             completed_rounds: completed_rounds.clone(),
-                            current_round: current_round.as_ref().map(|rt| {
-                                let r = &rt[team];
-                                CurrentRound {
-                                    encryptor: r.encryptor,
-                                    code: if r.encryptor == user_id {
-                                        Some(r.code.clone())
-                                    } else {
-                                        None
-                                    },
-                                    clues: r.clues.clone(),
-                                    decipher: r.decipher.clone(),
-                                    intercept: r.intercept.clone(),
-                                }
+                            current_round: current_round.as_ref().map(|per_team| {
+                                per_team.clone().map(|team| CurrentRoundPerTeam {
+                                    encryptor: team.encryptor,
+                                    clues: team.clues.clone(),
+                                    decipher: team.decipher.clone(),
+                                    intercept: team.intercept.clone(),
+                                })
                             }),
                             phase: *phase,
+                            code,
                         }
                     } else {
                         GameStateView::InGameNotInTeam
@@ -503,6 +506,10 @@ impl State {
                 // Mark player as kicked. If in game, store the team so they must re-join it again if joining later.
                 game_info.kick_player(kick_user_id);
 
+                game_info.global_chat.push(ChatMessage::system(format!(
+                    "Disconnected <{kick_user_id}> was kicked the game by <{user_id}>"
+                )));
+
                 let kick_user_data = self.users.get_mut(&kick_user_id).expect("Should exist");
                 kick_user_data.game = None;
                 self.broadcast_game_state(game_id).await;
@@ -679,7 +686,7 @@ impl State {
 
                         // Success.
                         game_info.global_chat.push(ChatMessage::system(format!(
-                            "<{user_id}> submitted decipher {attempt:?}"
+                            "<{user_id}> submitted decipher {attempt}"
                         )));
                         current_round[team].decipher = Some(attempt);
                         game_info.proceed_if_ready();
@@ -755,7 +762,7 @@ impl State {
 
                         // Success.
                         game_info.global_chat.push(ChatMessage::system(format!(
-                            "{user_id}> submitted intercept {attempt:?}"
+                            "<{user_id}> submitted intercept {attempt}"
                         )));
                         current_round[team].intercept = Some(attempt);
                         game_info.proceed_if_ready();

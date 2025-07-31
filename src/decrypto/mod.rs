@@ -9,10 +9,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     decrypto::settings::GameSettings,
     id::UserId,
-    message::{ChatMessage, Clue, CurrentRound},
+    message::{ChatMessage, Clue, CurrentRoundPerTeam},
 };
 
+mod code;
 pub mod settings;
+
+pub use code::Code;
 
 /// Global game state
 pub struct GameState {}
@@ -169,19 +172,22 @@ impl GameInfo {
                     .count()
                     == 2
                 {
-                    // Both teams have given clues, proceed to intercept phase, or decipher phase if first round
-                    if completed_rounds.is_empty() {
-                        *phase = Phase::Decipher(Team::WHITE);
+                    *phase = if completed_rounds.is_empty() {
+                        Phase::Decipher(Team::WHITE)
                     } else {
-                        *phase = Phase::Intercept(Team::WHITE);
-                    }
+                        Phase::Intercept(Team::WHITE)
+                    };
                 }
             }
             Phase::Decipher(team_to_decipher) => {
                 let round = current_round.as_ref().expect("Invalid state");
                 if round[team_to_decipher].decipher.is_some() {
                     if team_to_decipher == Team::WHITE {
-                        *phase = Phase::Intercept(Team::BLACK);
+                        *phase = if completed_rounds.is_empty() {
+                            Phase::Decipher(Team::BLACK)
+                        } else {
+                            Phase::Intercept(Team::BLACK)
+                        };
                     } else {
                         self.next_round();
                     }
@@ -285,6 +291,12 @@ pub struct TeamInGame {
 #[serde(rename_all = "snake_case")]
 pub struct PerTeam<T>(pub [T; 2]);
 
+impl<T> PerTeam<T> {
+    pub fn map<R>(self, f: impl Fn(T) -> R) -> PerTeam<R> {
+        PerTeam(self.0.map(f))
+    }
+}
+
 impl<T> From<[T; 2]> for PerTeam<T> {
     fn from(v: [T; 2]) -> Self {
         Self(v)
@@ -310,14 +322,14 @@ pub type Round = PerTeam<RoundPerTeam>;
 #[serde(rename_all = "snake_case")]
 pub struct RoundPerTeam {
     pub encryptor: UserId,
-    pub code: Vec<usize>,
+    pub code: Code,
     /// `None` if the team ran out of time, or has not given clues yet.
     pub clues: Option<Vec<Clue>>,
     /// `None` if the team ran out of time, or has not guessed yet.
-    pub decipher: Option<Vec<usize>>,
+    pub decipher: Option<Code>,
     /// Intercept attempt submitted by this team.
     /// `None` if the team ran out of time, or has not intercepted yet.
-    pub intercept: Option<Vec<usize>>,
+    pub intercept: Option<Code>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -19,7 +19,7 @@ const renderPlayer = (state, player) => {
 
 export default function viewInGame(state) {
     return html`
-    <div id="lobby" class="column spacer">
+    <div id="lobby">
         <h1>
             Waiting for players to join
             <input
@@ -39,14 +39,14 @@ export default function viewInGame(state) {
             ${state.game.lobby.reason_not_startable ? html`(${state.game.lobby.reason_not_startable})` : ''}
         </p>
         <h2>Teams</h2>
-        <div id="lobby-teams" class="row">
+        <div id="lobby-teams" class="row wrap">
             <div>
                 <h3>No team selected</h3>
                 ${state.game.players.filter(p => p.is_in_game && p.team === null).map(p => renderPlayer(state, p))}
             </div>
             <div>
                 <h3>
-                    Team 2
+                    Team 1
                     <input
                         type="button"
                         value="Join"

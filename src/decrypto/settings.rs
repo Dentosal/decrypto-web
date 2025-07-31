@@ -3,7 +3,7 @@ use std::{array, collections::HashMap, time::Duration};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
-use crate::decrypto::Team;
+use crate::decrypto::{Code, Team};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -57,11 +57,11 @@ impl GameSettings {
     }
 
     /// Note that the code used zero-based indexing.
-    pub fn make_random_code(&self) -> Vec<usize> {
+    pub fn make_random_code(&self) -> Code {
         let mut data: Vec<_> = (0..self.keyword_count).collect();
         data.shuffle(&mut rand::rng());
         data.truncate(self.clue_count);
-        data
+        Code(data)
     }
 
     pub fn pick_random_keywords(&self) -> (Vec<String>, Vec<String>) {

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    decrypto::{Phase, Role, Round, Team, settings::GameSettings},
+    decrypto::{Code, PerTeam, Phase, Role, Round, Team, settings::GameSettings},
     id::{GameId, UserId, UserSecret},
 };
 
@@ -18,8 +18,8 @@ pub enum FromClient {
     Kick(UserId),
     StartGame,
     SubmitClues(Vec<Clue>),
-    SubmitDecipher(Vec<usize>),
-    SubmitIntercept(Vec<usize>),
+    SubmitDecipher(Code),
+    SubmitIntercept(Code),
     GlobalChat(String),
 }
 
@@ -82,12 +82,15 @@ pub enum GameStateView {
     InGame {
         /// Complete rounds (public info).
         completed_rounds: Vec<Round>,
-        /// Current round (partially private info).
-        current_round: Option<CurrentRound>,
+        /// Current round (public info).
+        current_round: Option<PerTeam<CurrentRoundPerTeam>>,
         /// Keywords for this team (private info).
         keywords: Vec<String>,
         /// Phase of the game (public info).
         phase: Phase,
+        /// Currently active code for your team.
+        /// Only visible to the encryptor of the current round.
+        code: Option<Code>,
     },
     /// The game is in progress, but you're not in a team.
     InGameNotInTeam,
@@ -95,16 +98,14 @@ pub enum GameStateView {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct CurrentRound {
+pub struct CurrentRoundPerTeam {
     pub encryptor: UserId,
-    /// Only visible to the encryptor.
-    pub code: Option<Vec<usize>>,
     /// `None` if the team ran out of time, or has not given clues yet.
     pub clues: Option<Vec<Clue>>,
     /// `None` if the team ran out of time, or has not guessed yet.
-    pub decipher: Option<Vec<usize>>,
+    pub decipher: Option<Code>,
     /// `None` if the team ran out of time, or has not intercepted yet.
-    pub intercept: Option<Vec<usize>>,
+    pub intercept: Option<Code>,
 }
 
 /// Game view from the perspective of single user.

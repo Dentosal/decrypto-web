@@ -80,8 +80,23 @@ body {
     gap: 0;
 }
 
+.sidebar-split {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
 #welcome, #lobby, #in_game {
     padding: 10px;
+}
+
+#lobby, #in_game {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 10px;
 }
 
 #lobby-teams > div {
@@ -93,6 +108,7 @@ body {
 
 #sidebar {
     background-color: #eee;
+    max-width: fit-content;
 }
 
 .global-chat {
@@ -111,13 +127,21 @@ body {
 
 .chat-message {
     gap: 10px;
-    justify-content: space-between;
+    justify-content: flex-start;
+}
+
+.chat-message .content {
+    max-width: 500px;
 }
 
 .chat-message .mention {
     background-color: #aaa;
     border-radius: 5px;
-    padding: 5px;
+    padding: 2px 5px;
+}
+
+.chat-message .author {
+    font-weight: bold;
 }
 
 .system-msg > .author {
@@ -134,4 +158,24 @@ body {
     border: 1px solid #aaa;
     border-radius: 5px;
     padding: 5px 10px;
+}
+
+.history {
+    border-collapse: collapse;
+    width: 100%;
+    overflow: scroll;
+}
+
+.history th, .history td {
+    border: 1px solid black;
+}
+
+.history td {
+    padding: 5px
+}
+
+.col-clue {
+    min-width: 120px;
+    max-width: 20vw;
+    overflow-x: scroll;
 }

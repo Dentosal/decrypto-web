@@ -133,7 +133,7 @@ const currentView = () => {
         } else {
             view = viewInGame;
         }
-        return html`${topbar(state)}<div class="row">${[view(state), sidebar(state)]}</div>`;
+        return html`${topbar(state)}<div class="sidebar-split">${[view(state), sidebar(state)]}</div>`;
     }
 
     return html`${[topbar(state), viewNotInLobby(state)]}`;
