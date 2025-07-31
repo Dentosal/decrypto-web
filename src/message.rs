@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    decrypto::{Code, PerTeam, Phase, Role, Round, Team, settings::GameSettings},
+    decrypto::{Code, PerTeam, Role, Round, Team, settings::GameSettings},
     id::{GameId, UserId, UserSecret},
 };
 
@@ -86,11 +86,8 @@ pub enum GameStateView {
         current_round: Option<PerTeam<CurrentRoundPerTeam>>,
         /// Keywords for this team (private info).
         keywords: Vec<String>,
-        /// Phase of the game (public info).
-        phase: Phase,
-        /// Currently active code for your team.
-        /// Only visible to the encryptor of the current round.
-        code: Option<Code>,
+        /// Inputs for the current player
+        inputs: Inputs,
     },
     /// The game is in progress, but you're not in a team.
     InGameNotInTeam,
@@ -103,8 +100,10 @@ pub struct CurrentRoundPerTeam {
     /// `None` if the team ran out of time, or has not given clues yet.
     pub clues: Option<Vec<Clue>>,
     /// `None` if the team ran out of time, or has not guessed yet.
+    /// Only visible for the team themselves.
     pub decipher: Option<Code>,
     /// `None` if the team ran out of time, or has not intercepted yet.
+    /// Only visible for the team themselves.
     pub intercept: Option<Code>,
 }
 
@@ -135,4 +134,14 @@ pub enum ErrorSeverity {
 pub enum Clue {
     Text(String),
     Image(Uuid),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Inputs {
+    Encrypt(Code),
+    Guess { intercept: bool, decipher: bool },
+    WaitingForEncryptors(PerTeam<bool>),
+    WaitingForGuessers(PerTeam<bool>),
+    RoundNotActive,
 }

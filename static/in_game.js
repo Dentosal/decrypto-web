@@ -63,7 +63,7 @@ const submitClues = (state) => {
 
     console.log("Submitting clues:", data);
     if (data.length === 0) { // XXX: dev mode: submit keywords as clues
-        for (let code_part of state.game.in_game.code) {
+        for (let code_part of state.game.in_game.inputs.encrypt) {
             data.push({text : state.game.in_game.keywords[code_part]});
         }
         console.warn("Clues empty, submitting keywords instead:", data);
@@ -101,79 +101,56 @@ const parseGuess = (state, guess) => {
     return result;
 }
 
-const renderAction = (state) => {
-    // State cleanup
-    if (state.game.in_game.phase !== 'encrypt') {
-        state.clue_inputs = [];
-    };
-    if (state.game.in_game.phase !== 'decipher') {
-        state.decipher_input = '';
-    };
-    if (state.game.in_game.phase !== 'intercept') {
-        state.intercept_input = '';
-    };
-
+const renderDecipher = (state) => {
     let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
-    let isEncryptor = !!state.game.in_game.code;
-    
-    if (state.game.in_game.phase === 'encrypt') {
-        let is_submitted = state.game.in_game.current_round[+myTeam].clues !== null;
-        if (!is_submitted) {
-            if (!isEncryptor) {
-                return html`
-                <div>
-                    Waiting for
-                    ${state.game.players.find(p => p.id === state.game.in_game.current_round[+myTeam].encryptor).nick}
-                    to give clues...
-                </div>`;
-            }
-            let code = state.game.in_game.code;
-            return html`
-            <div>
-                <p>It's your turn to give clues!</p>
-                <div>
-                Code: ${code.map((num) => num + 1).join('-')} (for ${code.map((num) => state.game.in_game.keywords[num]).join(', ')})
-                </div>
-                <table>
-                    ${code.map(num => renderClueInput(state, num))}
-                </table>
-                <input
-                    type="button"
-                    value="Proceed"
-                    @click=${() => submitClues(state)}
-                />
-            </div>
-            `;
-        }
-        return html`
-        <div>
-            Waiting for the other team to give clues...
-            ${renderHurryUp(state)}
-        </div>`;
-    } else if ('intercept' in state.game.in_game.phase) {
-        let teamToIntercept = state.game.in_game.phase.intercept;
-        
-        if (myTeam === teamToIntercept) {
-            return html`
-            <div>
-                Waiting for the other team to intercept your clues...
-                ${renderHurryUp(state)}
-            </div>`;
-        }
 
-        const onKeyPress = (e) => {
-            if (e.key === 'Enter') {
-                let guess = parseGuess(state, e.target.value);
-                if (guess === null) {
-                    e.target.setCustomValidity(e.target.title);
-                    e.target.reportValidity();
-                } else {
-                    state.send({ submit_intercept: guess });
-                }
+    const onKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            let guess = parseGuess(state, e.target.value);
+            if (guess === null) {
+                e.target.setCustomValidity(e.target.title);
+                e.target.reportValidity();
+            } else {
+                state.send({ submit_decipher: guess });
             }
-        };
+        }
+    };
 
-        return html`
+    return html`
+    <div>
+        <p>Attempt to decipher your clues:</p>
+        <ul>
+            ${state.game.in_game.current_round[+myTeam].clues.map(clue => html`<li>${renderClue(state, clue)}</li>`)}
+        </ul>
+        <input
+            type="text"
+            placeholder="${[...Array(state.game.settings.clue_count).keys().map(i => i + 1)].join('-')}"
+            required
+            title="Enter your guess as a sequence of numbers, separated by dashes (e.g. 1-2-3)"
+            .value=${state.decipher_input || ''}
+            @input=${(e) => state.decipher_input = e.target.value}
+            @keypress=${onKeyPress}
+        >
+    </div>
+    `;
+}
+
+const renderIntercept = (state) => {
+    let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
+
+    const onKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            let guess = parseGuess(state, e.target.value);
+            if (guess === null) {
+                e.target.setCustomValidity(e.target.title);
+                e.target.reportValidity();
+            } else {
+                state.send({ submit_intercept: guess });
+            }
+        }
+    };
+
+    return html`
         <div>
             <p>Attempt interception:</p>
             <ul>
@@ -190,54 +167,71 @@ const renderAction = (state) => {
             >
         </div>
         `;
-    } else if ('decipher' in state.game.in_game.phase) {
-        let teamToDecipher = state.game.in_game.phase.decipher;
-        
-        if (myTeam !== teamToDecipher) {
-            return html`
-            <div>
-                Waiting for the other team to decipher their clues...
-                ${renderHurryUp(state)}
-            </div>`;
-        }
+}
 
-        if (isEncryptor) {
-            return html`
-            <div>
-                Waiting for the your team to decipher their clues...
-                ${renderHurryUp(state)}
-            </div>`;
-        }
+const renderAction = (state) => {
+    // State cleanup
+    if (state.game.in_game.phase !== 'encrypt') {
+        state.clue_inputs = [];
+    };
+    if (state.game.in_game.phase !== 'decipher') {
+        state.decipher_input = '';
+    };
+    if (state.game.in_game.phase !== 'intercept') {
+        state.intercept_input = '';
+    };
 
-        const onKeyPress = (e) => {
-            if (e.key === 'Enter') {
-                let guess = parseGuess(state, e.target.value);
-                if (guess === null) {
-                    e.target.setCustomValidity(e.target.title);
-                    e.target.reportValidity();
-                } else {
-                    state.send({ submit_decipher: guess });
-                }
-            }
-        };
-
+    let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
+    
+    if ('encrypt' in state.game.in_game.inputs) {
+        let code = state.game.in_game.inputs.encrypt;
         return html`
         <div>
-            <p>Attempt to decipher your clues:</p>
-            <ul>
-                ${state.game.in_game.current_round[+myTeam].clues.map(clue => html`<li>${renderClue(state, clue)}</li>`)}
-            </ul>
+            <p>It's your turn to give clues!</p>
+            <div>
+            Code: ${code.map((num) => num + 1).join('-')} (for ${code.map((num) => state.game.in_game.keywords[num]).join(', ')})
+            </div>
+            <table>
+                ${code.map(num => renderClueInput(state, num))}
+            </table>
             <input
-                type="text"
-                placeholder="${[...Array(state.game.settings.clue_count).keys().map(i => i + 1)].join('-')}"
-                required
-                title="Enter your guess as a sequence of numbers, separated by dashes (e.g. 1-2-3)"
-                .value=${state.decipher_input || ''}
-                @input=${(e) => state.decipher_input = e.target.value}
-                @keypress=${onKeyPress}
-            >
+                type="button"
+                value="Proceed"
+                @click=${() => submitClues(state)}
+            />
         </div>
         `;
+    } else if ('guess' in state.game.in_game.inputs) {
+        let intercept = state.game.in_game.inputs.guess.intercept;
+        let decipher = state.game.in_game.inputs.guess.decipher;    
+        return html`${[
+            decipher ? renderDecipher(state) : null,
+            intercept ? renderIntercept(state) : null
+        ]}`;
+    } else if ('waiting_for_encryptors' in state.game.in_game.inputs) {
+        let waitingFor = state.game.in_game.inputs.waiting_for_encryptors;
+        let ourEncryptor = state.game.in_game.current_round[+myTeam].encryptor;
+        let theirEncryptor = state.game.in_game.current_round[+!myTeam].encryptor;
+        let ourEncryptorName = state.game.players.find(p => p.id === ourEncryptor)?.nick;
+        let theirEncryptorName = state.game.players.find(p => p.id === theirEncryptor)?.nick;
+        let ourMention = html`<span x-mention="${ourEncryptor}">${ourEncryptorName}</span>`;
+        let theirMention = html`<span x-mention="${theirEncryptor}">${theirEncryptorName}</span>`;
+        if (waitingFor[+myTeam] && waitingFor[+!myTeam]) {
+            return html`<p>Waiting for both teams to finish encrypting (${ourMention}, ${theirMention})...</p>`;
+        } else if (waitingFor[+myTeam]) {
+            return html`<p>Waiting for your team to finish encrypting (${ourMention})...</p>`;
+        } else {
+            return html`<p>Waiting for the other team to finish encrypting (${theirMention})...</p>`;
+        }
+    } else if ('waiting_for_guessers' in state.game.in_game.inputs) {
+        let waitingFor = state.game.in_game.inputs.waiting_for_guessers;
+        if (waitingFor[+myTeam] && waitingFor[+!myTeam]) {
+            return html`<p>Waiting for both teams to finish guessing...</p>`;
+        } else if (waitingFor[+myTeam]) {
+            return html`<p>Waiting for your team to finish guessing...</p>`;
+        } else {
+            return html`<p>Waiting for the other team to finish guessing...</p>`;
+        }
     } else {
         return html`Error: unknown game state ???`;
     }

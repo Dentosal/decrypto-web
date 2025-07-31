@@ -65,11 +65,7 @@ impl fmt::Display for RoundResult {
         )?;
 
         if let Some(intercept) = self.intercept {
-            if intercept {
-                write!(f, ", intercept successful")
-            } else {
-                write!(f, ", failed to intercept")
-            }
+            write!(f, ", intercept {}", if intercept { "ok" } else { "failed" })
         } else {
             write!(f, "")
         }
@@ -179,62 +175,33 @@ impl GameInfo {
                     intercept: None,
                 }
             }))),
-            phase: Phase::Encrypt,
         };
     }
 
     #[must_use]
-    pub fn proceed_if_ready(&mut self) -> Option<PerTeam<RoundResult>> {
+    pub fn next_round_if_ready(&mut self) -> Option<PerTeam<RoundResult>> {
         let GameInfoState::InGame {
             completed_rounds,
             current_round,
-            phase,
             ..
         } = &mut self.state
         else {
-            return None;
+            panic!("Cannot proceed to next round in non-in-game state");
+        };
+        let Some(current_round) = current_round else {
+            panic!("A round must be active")
         };
 
-        // TODO
-        match *phase {
-            Phase::Encrypt => {
-                let round = current_round.as_ref().expect("Invalid state");
-                if Team::ORDER
-                    .iter()
-                    .filter(|team| round[**team].clues.is_some())
-                    .count()
-                    == 2
-                {
-                    *phase = if completed_rounds.is_empty() {
-                        Phase::Decipher(Team::WHITE)
-                    } else {
-                        Phase::Intercept(Team::WHITE)
-                    };
-                }
-            }
-            Phase::Decipher(team_to_decipher) => {
-                let round = current_round.as_ref().expect("Invalid state");
-                if round[team_to_decipher].decipher.is_some() {
-                    if team_to_decipher == Team::WHITE {
-                        *phase = if completed_rounds.is_empty() {
-                            Phase::Decipher(Team::BLACK)
-                        } else {
-                            Phase::Intercept(Team::BLACK)
-                        };
-                    } else {
-                        return Some(self.next_round());
-                    }
-                }
-            }
-            Phase::Intercept(team_to_intercept) => {
-                let round = current_round.as_ref().expect("Invalid state");
-                if round[team_to_intercept.other()].intercept.is_some() {
-                    *phase = Phase::Decipher(team_to_intercept);
-                }
-            }
-            _ => {}
+        let is_done = current_round.both(|r| {
+            r.clues.is_some()
+                && r.decipher.is_some()
+                && (r.intercept.is_some() || completed_rounds.is_empty())
+        });
+        if is_done {
+            Some(self.next_round())
+        } else {
+            None
         }
-        None
     }
 
     #[must_use]
@@ -243,7 +210,6 @@ impl GameInfo {
         let GameInfoState::InGame {
             completed_rounds,
             current_round,
-            phase,
             ..
         } = &mut self.state
         else {
@@ -256,7 +222,6 @@ impl GameInfo {
             .expect("Cannot proceed to next round without current round");
         completed_rounds.push(ended_round.clone());
         let score = ended_round.score();
-        *phase = Phase::Encrypt;
         *current_round = Some(Round::from(Team::ORDER.map(|team| {
             // Pick a the next encryptor for the team.
             let players = &players_in_teams[team];
@@ -314,7 +279,6 @@ pub enum GameInfoState {
         teams: [TeamInGame; 2],
         completed_rounds: Vec<Round>,
         current_round: Option<Round>,
-        phase: Phase,
     },
 }
 
@@ -330,6 +294,14 @@ pub struct TeamInGame {
 pub struct PerTeam<T>(pub [T; 2]);
 
 impl<T> PerTeam<T> {
+    pub fn from_fn(f: impl Fn(Team) -> T) -> Self {
+        PerTeam(Team::ORDER.map(f))
+    }
+
+    pub fn both(&self, f: impl Fn(&T) -> bool) -> bool {
+        self.0.iter().all(f)
+    }
+
     pub fn map<R>(self, f: impl Fn(T) -> R) -> PerTeam<R> {
         PerTeam(self.0.map(f))
     }
@@ -403,20 +375,4 @@ pub struct RoundPerTeam {
     /// Intercept attempt submitted by this team.
     /// `None` if the team ran out of time, or has not intercepted yet.
     pub intercept: Option<Code>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Phase {
-    /// Encryptor is giving clues.
-    /// Done after both teams have given clues,
-    /// or when the time runs out.
-    Encrypt,
-    /// The team marks the team whose clues is being intercepted.
-    Intercept(Team),
-    /// The team guesses their own teams code.
-    Decipher(Team),
-    /// TODO: Tiebreaker phase.
-    Tiebreaker,
-    GameOver,
 }

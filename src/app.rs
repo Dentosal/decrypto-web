@@ -7,12 +7,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     decrypto::{
-        GameInfo, GameInfoState, GamePlayerInfo, GameState, Phase, Team, settings::GameSettings,
+        GameInfo, GameInfoState, GamePlayerInfo, GameState, PerTeam, Team, settings::GameSettings,
     },
     id::{ConnectionId, GameId, UserId, UserSecret},
     message::{
         ChatMessage, CurrentRoundPerTeam, ErrorSeverity, FromClient, GameStateView, GameView,
-        PlayerInfo, ToClient, UserInfo,
+        Inputs, PlayerInfo, ToClient, UserInfo,
     },
 };
 
@@ -164,32 +164,62 @@ impl State {
                     teams,
                     completed_rounds,
                     current_round,
-                    phase,
                 } => {
                     if let Some(team) = game_info.team_for_user(user_id) {
                         let team_info = &teams[team.index()];
 
-                        let code = current_round.as_ref().and_then(|per_team| {
-                            if per_team[team].encryptor == user_id {
-                                Some(per_team[team].code.clone())
-                            } else {
-                                None
-                            }
-                        });
-
                         GameStateView::InGame {
                             keywords: team_info.keywords.clone(),
                             completed_rounds: completed_rounds.clone(),
-                            current_round: current_round.as_ref().map(|per_team| {
-                                per_team.clone().map(|team| CurrentRoundPerTeam {
-                                    encryptor: team.encryptor,
-                                    clues: team.clues.clone(),
-                                    decipher: team.decipher.clone(),
-                                    intercept: team.intercept.clone(),
+                            current_round: current_round.as_ref().map(|round| {
+                                PerTeam::from_fn(|t| CurrentRoundPerTeam {
+                                    encryptor: round[t].encryptor,
+                                    clues: round[t].clues.clone(),
+                                    decipher: if t == team {
+                                        round[t].decipher.clone()
+                                    } else {
+                                        None
+                                    },
+                                    intercept: if t == team {
+                                        round[t].intercept.clone()
+                                    } else {
+                                        None
+                                    },
                                 })
                             }),
-                            phase: *phase,
-                            code,
+                            inputs: if let Some(current_round) = current_round {
+                                let is_encryptor = current_round[team].encryptor == user_id;
+                                if current_round.both(|r| r.clues.is_some()) {
+                                    let decipher =
+                                        current_round[team].decipher.is_none() && !is_encryptor;
+                                    let intercept = current_round[team].intercept.is_none()
+                                        && !completed_rounds.is_empty();
+                                    if decipher || intercept {
+                                        Inputs::Guess {
+                                            intercept,
+                                            decipher,
+                                        }
+                                    } else {
+                                        Inputs::WaitingForGuessers(PerTeam::from_fn(|team| {
+                                            current_round[team].decipher.is_none()
+                                                || (current_round[team].intercept.is_none()
+                                                    && !completed_rounds.is_empty())
+                                        }))
+                                    }
+                                } else {
+                                    if current_round[team].clues.is_none() && is_encryptor {
+                                        Inputs::Encrypt(current_round[team].code.clone())
+                                    } else {
+                                        Inputs::WaitingForEncryptors(
+                                            current_round
+                                                .clone()
+                                                .map(|round| round.clues.is_none()),
+                                        )
+                                    }
+                                }
+                            } else {
+                                Inputs::RoundNotActive
+                            },
                         }
                     } else {
                         GameStateView::InGameNotInTeam
@@ -542,18 +572,7 @@ impl State {
 
                 let game_info = self.games.get_mut(&game_id).expect("Should exist");
                 if let Some(team) = game_info.team_for_user(user_id) {
-                    if let GameInfoState::InGame {
-                        current_round,
-                        phase,
-                        ..
-                    } = &mut game_info.state
-                    {
-                        if *phase != Phase::Encrypt {
-                            self.send_error(id, "Encrypt phase is not active", ErrorSeverity::Info)
-                                .await;
-                            return Err(());
-                        }
-
+                    if let GameInfoState::InGame { current_round, .. } = &mut game_info.state {
                         let Some(current_round) = current_round else {
                             self.send_error(id, "No round in progress", ErrorSeverity::Info)
                                 .await;
@@ -603,11 +622,6 @@ impl State {
                             "<{user_id}> submitted clues {clues:?}"
                         )));
                         current_round[team].clues = Some(clues);
-                        if let Some(result) = game_info.proceed_if_ready() {
-                            game_info.global_chat.push(ChatMessage::system(format!(
-                                "Round ended, scores: {result}"
-                            )));
-                        }
                         self.broadcast_game_state(game_id).await;
                         Ok(())
                     } else {
@@ -627,32 +641,7 @@ impl State {
 
                 let game_info = self.games.get_mut(&game_id).expect("Should exist");
                 if let Some(team) = game_info.team_for_user(user_id) {
-                    if let GameInfoState::InGame {
-                        current_round,
-                        phase,
-                        ..
-                    } = &mut game_info.state
-                    {
-                        let Phase::Decipher(team_to_decipher) = *phase else {
-                            self.send_error(
-                                id,
-                                "Decipher phase is not active",
-                                ErrorSeverity::Info,
-                            )
-                            .await;
-                            return Err(());
-                        };
-
-                        if team != team_to_decipher {
-                            self.send_error(
-                                id,
-                                "You are not allowed to submit decipher clues for the other team",
-                                ErrorSeverity::Info,
-                            )
-                            .await;
-                            return Err(());
-                        }
-
+                    if let GameInfoState::InGame { current_round, .. } = &mut game_info.state {
                         let Some(current_round) = current_round else {
                             self.send_error(id, "No round in progress", ErrorSeverity::Info)
                                 .await;
@@ -689,11 +678,8 @@ impl State {
                         }
 
                         // Success.
-                        game_info.global_chat.push(ChatMessage::system(format!(
-                            "<{user_id}> submitted decipher {attempt}"
-                        )));
                         current_round[team].decipher = Some(attempt);
-                        if let Some(result) = game_info.proceed_if_ready() {
+                        if let Some(result) = game_info.next_round_if_ready() {
                             game_info.global_chat.push(ChatMessage::system(format!(
                                 "Round ended, scores: {result}"
                             )));
@@ -719,24 +705,14 @@ impl State {
                 if let Some(team) = game_info.team_for_user(user_id) {
                     if let GameInfoState::InGame {
                         current_round,
-                        phase,
+                        completed_rounds,
                         ..
                     } = &mut game_info.state
                     {
-                        let Phase::Intercept(team_to_intercept) = *phase else {
+                        if completed_rounds.is_empty() {
                             self.send_error(
                                 id,
-                                "Intercept phase is not active",
-                                ErrorSeverity::Info,
-                            )
-                            .await;
-                            return Err(());
-                        };
-
-                        if team == team_to_intercept {
-                            self.send_error(
-                                id,
-                                "You cannot intercept your own team's clues",
+                                "Cannot intercept in the first round",
                                 ErrorSeverity::Info,
                             )
                             .await;
@@ -769,11 +745,8 @@ impl State {
                         }
 
                         // Success.
-                        game_info.global_chat.push(ChatMessage::system(format!(
-                            "<{user_id}> submitted intercept {attempt}"
-                        )));
                         current_round[team].intercept = Some(attempt);
-                        if let Some(result) = game_info.proceed_if_ready() {
+                        if let Some(result) = game_info.next_round_if_ready() {
                             game_info.global_chat.push(ChatMessage::system(format!(
                                 "Round ended, scores: {result}"
                             )));
