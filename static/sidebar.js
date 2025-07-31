@@ -20,8 +20,16 @@ const renderPlayer = (state, player) => {
 
 const renderPlayerList = state => {
     return html`
-    <div class="player-list column wrap">
-        ${state.game.players.filter(p => p.is_in_game).map(p => renderPlayer(state, p))}
+    <div class="player-list row wrap">
+        <div>
+            ${state.game.players.filter(p => p.is_in_game && p.team === false).map(p => renderPlayer(state, p))}
+        </div>
+        <div>
+            ${state.game.players.filter(p => p.is_in_game && p.team === true).map(p => renderPlayer(state, p))}
+        </div>
+        <div>
+            ${state.game.players.filter(p => p.is_in_game && p.team === null).map(p => renderPlayer(state, p))}
+        </div>
     </div>
     `;
 }

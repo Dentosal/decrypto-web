@@ -163,9 +163,8 @@ body {
 }
 
 .player-list {
-    gap: 15px;
-    padding: 20px;
-    border-radius: 5px;
+    gap: 5px;
+    padding: 10px;
 }
 
 .team {
