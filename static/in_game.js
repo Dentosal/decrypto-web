@@ -65,7 +65,7 @@ const submitClues = (state) => {
 
     console.log("Submitting clues:", data);
     if (data.length === 0) { // XXX: dev mode: submit keywords as clues
-        for (let code_part of state.game.in_game.inputs.encrypt) {
+        for (let code_part of state.game.in_game.inputs.encrypt.code) {
             data.push({text : state.game.in_game.keywords[code_part]});
         }
         console.warn("Clues empty, submitting keywords instead:", data);
@@ -78,7 +78,7 @@ const renderHurryUp = state => {
     <input
         type="button"
         value="Hurry up!"
-        @click=${ () => state.send({ frustrated: state.game.in_game.phase }) }
+        @click=${ () => state.send({ frustrated: state.game.in_game.inputs }) }
     />
     `;
 }
@@ -186,7 +186,7 @@ const renderAction = (state) => {
     let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
     
     if ('encrypt' in state.game.in_game.inputs) {
-        let code = state.game.in_game.inputs.encrypt;
+        let code = state.game.in_game.inputs.encrypt.code;
         return html`
         <div class="input-action">
             <h1>It's your turn to give clues!</h1>
@@ -211,7 +211,7 @@ const renderAction = (state) => {
             intercept ? renderIntercept(state) : null
         ]}`;
     } else if ('waiting_for_encryptors' in state.game.in_game.inputs) {
-        let waitingFor = state.game.in_game.inputs.waiting_for_encryptors;
+        let waitingFor = state.game.in_game.inputs.waiting_for_encryptors.teams;
         let ourEncryptor = state.game.in_game.current_round[+myTeam].encryptor;
         let theirEncryptor = state.game.in_game.current_round[+!myTeam].encryptor;
         if (waitingFor[+myTeam] && waitingFor[+!myTeam]) {
@@ -219,27 +219,29 @@ const renderAction = (state) => {
             <div class="input-action"><h1>
                 Waiting for both teams to finish encrypting
                 (${semantic.player(state, ourEncryptor)}, ${semantic.player(state, theirEncryptor) })...
-            </h1></div>`;
+            </h1>${renderHurryUp(state)}</div>`;
         } else if (waitingFor[+myTeam]) {
             return html`<div class="input-action"><h1>
                 Waiting for your team to finish encrypting
                 (${semantic.player(state, ourEncryptor)})...
-            </h1></div>`;
+            </h1>${renderHurryUp(state)}</div>`;
         } else {
             return html`<div class="input-action"><h1>
                 Waiting for the other team to finish encrypting
                 (${semantic.player(state, theirEncryptor)})...
-            </h1></div>`;
+            </h1>${renderHurryUp(state)}</div>`;
         }
     } else if ('waiting_for_guessers' in state.game.in_game.inputs) {
-        let waitingFor = state.game.in_game.inputs.waiting_for_guessers;
+        let waitingFor = state.game.in_game.inputs.waiting_for_guessers.teams;
+        let waitText;
         if (waitingFor[+myTeam] && waitingFor[+!myTeam]) {
-            return html`<div class="input-action"><h1>Waiting for both teams to finish guessing...</h1></div>`;
+            waitText = "Waiting for both teams to finish guessing...";
         } else if (waitingFor[+myTeam]) {
-            return html`<div class="input-action"><h1>Waiting for your team to finish guessing...</h1></div>`;
+            waitText = "Waiting for your team to finish guessing...";
         } else {
-            return html`<div class="input-action"><h1>Waiting for the other team to finish guessing...</h1></div>`;
+            waitText = "Waiting for the other team to finish guessing...";
         }
+        return html`<div class="input-action"><h1>${waitText}</h1>${renderHurryUp(state)}</div>`;
     } else {
         return html`Error: unknown game state ???`;
     }

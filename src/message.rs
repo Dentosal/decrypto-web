@@ -22,6 +22,7 @@ pub enum FromClient {
     SubmitClues(Vec<Clue>),
     SubmitDecipher(Code),
     SubmitIntercept(Code),
+    Frustrated(Inputs),
     GlobalChat(String),
 }
 
@@ -150,9 +151,43 @@ pub enum Clue {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Inputs {
-    Encrypt(Code),
-    Guess { intercept: bool, decipher: bool },
-    WaitingForEncryptors(PerTeam<bool>),
-    WaitingForGuessers(PerTeam<bool>),
+    Encrypt {
+        code: Code,
+        deadline: Option<Deadline>,
+    },
+    Guess {
+        intercept: bool,
+        decipher: bool,
+        deadline: Option<Deadline>,
+    },
+    WaitingForEncryptors {
+        teams: PerTeam<bool>,
+        deadline: Option<Deadline>,
+    },
+    WaitingForGuessers {
+        teams: PerTeam<bool>,
+        deadline: Option<Deadline>,
+    },
     RoundNotActive,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Deadline {
+    /// Unix timestamp in seconds.
+    pub timestamp: u64,
+    /// Reason for the deadline.
+    pub reason: DeadlineReason,
+}
+
+/// Reason for the deadline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeadlineReason {
+    /// The deadline is fiex.
+    Fixed,
+    /// The other team has finished their part.
+    AfterOther,
+    /// Ohter team has clicked the "Hurry up!" button.
+    AfterFrustrated,
 }

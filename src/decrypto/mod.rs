@@ -152,10 +152,8 @@ impl GameInfo {
     pub fn start(&mut self) {
         debug_assert!(self.startable().is_ok());
 
-        let (kw_a, kw_b) = self.settings.pick_random_keywords();
-
         self.state = GameInfoState::InGame {
-            teams: [TeamInGame { keywords: kw_a }, TeamInGame { keywords: kw_b }],
+            keywords: self.settings.pick_random_keywords(),
             completed_rounds: Vec::new(),
             current_round: Some(Round::from(Team::ORDER.map(|team| {
                 RoundPerTeam {
@@ -272,17 +270,10 @@ pub enum GameInfoState {
     Lobby,
     /// Game that's started.
     InGame {
-        teams: [TeamInGame; 2],
+        keywords: PerTeam<Vec<String>>,
         completed_rounds: Vec<Round>,
         current_round: Option<Round>,
     },
-}
-
-/// Per-team private information, some of which is only visible to the encryptor.
-#[derive(Debug, Clone)]
-pub struct TeamInGame {
-    /// Keywords for the team
-    pub keywords: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

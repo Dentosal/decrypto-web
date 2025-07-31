@@ -161,15 +161,13 @@ impl State {
                     reason_not_startable: game_info.startable().err().map(|e| e.to_owned()),
                 },
                 GameInfoState::InGame {
-                    teams,
+                    keywords,
                     completed_rounds,
                     current_round,
                 } => {
                     if let Some(team) = game_info.team_for_user(user_id) {
-                        let team_info = &teams[team.index()];
-
                         GameStateView::InGame {
-                            keywords: team_info.keywords.clone(),
+                            keywords: keywords[team].clone(),
                             completed_rounds: completed_rounds
                                 .iter()
                                 .map(|round| {
@@ -207,23 +205,31 @@ impl State {
                                         Inputs::Guess {
                                             intercept,
                                             decipher,
+                                            deadline: None,
                                         }
                                     } else {
-                                        Inputs::WaitingForGuessers(PerTeam::from_fn(|team| {
-                                            current_round[team].decipher.is_none()
-                                                || (current_round[team].intercept.is_none()
-                                                    && !completed_rounds.is_empty())
-                                        }))
+                                        Inputs::WaitingForGuessers {
+                                            teams: PerTeam::from_fn(|team| {
+                                                current_round[team].decipher.is_none()
+                                                    || (current_round[team].intercept.is_none()
+                                                        && !completed_rounds.is_empty())
+                                            }),
+                                            deadline: None,
+                                        }
                                     }
                                 } else {
                                     if current_round[team].clues.is_none() && is_encryptor {
-                                        Inputs::Encrypt(current_round[team].code.clone())
+                                        Inputs::Encrypt {
+                                            code: current_round[team].code.clone(),
+                                            deadline: None,
+                                        }
                                     } else {
-                                        Inputs::WaitingForEncryptors(
-                                            current_round
+                                        Inputs::WaitingForEncryptors {
+                                            teams: current_round
                                                 .clone()
                                                 .map(|round| round.clues.is_none()),
-                                        )
+                                            deadline: None,
+                                        }
                                     }
                                 }
                             } else {
@@ -772,6 +778,12 @@ impl State {
                         .await;
                     Err(())
                 }
+            }
+            FromClient::Frustrated(inputs) => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                Err(())
             }
             FromClient::GlobalChat(message) => {
                 let user_id = self.require_auth(id).await?;

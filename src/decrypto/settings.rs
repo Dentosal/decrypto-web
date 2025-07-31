@@ -3,7 +3,7 @@ use std::{array, collections::HashMap, time::Duration};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
-use crate::decrypto::{Code, Team};
+use crate::decrypto::{Code, PerTeam, Team};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -27,10 +27,8 @@ pub struct GameSettings {
     pub intercept_limit: usize,
     /// Timer for encryptors to encrypt clues.
     pub encrypt_time_limit: EncryptTimeLimit,
-    /// Time to decide intercept attempt.
-    pub intercept_time_limit: GuessTimeLimit,
-    /// Time to decide guess attempt.
-    pub decipher_time_limit: GuessTimeLimit,
+    /// Time to decide decipher and intercept attempts.
+    pub guess_time_limit: GuessTimeLimit,
 }
 impl Default for GameSettings {
     fn default() -> Self {
@@ -43,8 +41,7 @@ impl Default for GameSettings {
             miscommunication_limit: 2,
             intercept_limit: 2,
             encrypt_time_limit: Default::default(),
-            intercept_time_limit: Default::default(),
-            decipher_time_limit: Default::default(),
+            guess_time_limit: Default::default(),
         }
     }
 }
@@ -70,14 +67,14 @@ impl GameSettings {
         Code(data)
     }
 
-    pub fn pick_random_keywords(&self) -> (Vec<String>, Vec<String>) {
+    pub fn pick_random_keywords(&self) -> PerTeam<Vec<String>> {
         let mut keywords = self.keyword_list.load();
         assert!(keywords.len() >= self.keyword_count);
 
         keywords.shuffle(&mut rand::rng());
         keywords.truncate(self.keyword_count * 2);
         let other = keywords.split_off(self.keyword_count);
-        (keywords, other)
+        PerTeam::from([keywords, other])
     }
 }
 
@@ -114,9 +111,9 @@ impl Default for EncryptTimeLimit {
 #[serde(rename_all = "snake_case")]
 pub struct GuessTimeLimit {
     /// Fixed upper limit.
-    fixed: Option<Duration>,
+    pub fixed: Option<Duration>,
     /// Timer that starts after the team marks frustration.
-    after_frustrated: Duration,
+    pub after_frustrated: Duration,
 }
 impl Default for GuessTimeLimit {
     fn default() -> Self {
