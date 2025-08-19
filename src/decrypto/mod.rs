@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fmt,
     ops::{Index, IndexMut},
+    time::Instant,
 };
 
 use rand::{Rng, seq::IndexedRandom};
@@ -10,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     decrypto::settings::GameSettings,
     id::UserId,
-    message::{ChatMessage, Clue, CurrentRoundPerTeam},
+    message::{ChatMessage, Clue, CurrentRoundPerTeam, Deadline, DeadlineReason},
 };
 
 mod code;
@@ -35,6 +36,12 @@ impl Team {
 
     pub fn index(self) -> usize {
         self.0 as usize
+    }
+}
+
+impl fmt::Display for Team {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "team:{}", self.0 as u8)
     }
 }
 
@@ -167,8 +174,15 @@ impl GameInfo {
                     clues: None,
                     decipher: None,
                     intercept: None,
+                    timed_out: TimedOut::default(),
                 }
             }))),
+            deadlines: PerTeam::from_fn(|_| {
+                self.settings.encrypt_time_limit.fixed.map(|dl| Deadline {
+                    at: Instant::now() + dl,
+                    reason: DeadlineReason::Fixed,
+                })
+            }),
         };
     }
 
@@ -187,9 +201,10 @@ impl GameInfo {
         };
 
         let is_done = current_round.both(|r| {
-            r.clues.is_some()
-                && r.decipher.is_some()
-                && (r.intercept.is_some() || completed_rounds.is_empty())
+            (r.clues.is_some() || r.timed_out.encrypt.is_some())
+                && ((r.decipher.is_some()
+                    && (r.intercept.is_some() || completed_rounds.is_empty()))
+                    || r.timed_out.guess.is_some())
         });
         if is_done {
             Some(self.next_round())
@@ -204,6 +219,7 @@ impl GameInfo {
         let GameInfoState::InGame {
             completed_rounds,
             current_round,
+            deadlines,
             ..
         } = &mut self.state
         else {
@@ -231,8 +247,19 @@ impl GameInfo {
                 clues: None,
                 decipher: None,
                 intercept: None,
+                timed_out: TimedOut::default(),
             }
         })));
+
+        *deadlines = PerTeam::splat(
+            self.settings
+                .encrypt_time_limit
+                .fixed
+                .map(|limit| Deadline {
+                    at: Instant::now() + limit,
+                    reason: DeadlineReason::Fixed,
+                }),
+        );
 
         score
     }
@@ -273,13 +300,19 @@ pub enum GameInfoState {
         keywords: PerTeam<Vec<String>>,
         completed_rounds: Vec<Round>,
         current_round: Option<Round>,
+        deadlines: PerTeam<Option<Deadline>>,
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct PerTeam<T>(pub [T; 2]);
 
+impl<T: Clone> PerTeam<T> {
+    pub fn splat(t: T) -> Self {
+        PerTeam([t.clone(), t])
+    }
+}
 impl<T> PerTeam<T> {
     pub fn from_fn(f: impl Fn(Team) -> T) -> Self {
         PerTeam(Team::ORDER.map(f))
@@ -310,6 +343,12 @@ impl<T> Index<Team> for PerTeam<T> {
 impl<T> IndexMut<Team> for PerTeam<T> {
     fn index_mut(&mut self, team: Team) -> &mut Self::Output {
         &mut self.0[team.index()]
+    }
+}
+
+impl PerTeam<bool> {
+    pub fn teams(self) -> impl Iterator<Item = Team> {
+        Team::ORDER.into_iter().filter(move |t| self.0[t.index()])
     }
 }
 
@@ -362,4 +401,23 @@ pub struct RoundPerTeam {
     /// Intercept attempt submitted by this team.
     /// `None` if the team ran out of time, or has not intercepted yet.
     pub intercept: Option<Code>,
+    pub timed_out: TimedOut,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct TimedOut {
+    pub encrypt: Option<DeadlineReason>,
+    pub guess: Option<DeadlineReason>,
+}
+impl TimedOut {
+    pub fn set_next(&mut self, reason: DeadlineReason) {
+        if self.encrypt.is_none() {
+            self.encrypt = Some(reason);
+        } else if self.guess.is_none() {
+            self.guess = Some(reason);
+        } else {
+            panic!("Cannot set more than two timeouts");
+        }
+    }
 }

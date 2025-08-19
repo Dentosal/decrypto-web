@@ -28,12 +28,12 @@ const player = (state, playerId) => {
 }
 
 const team = (state, team, shorthand) => {
-    if (team === null) return shorthand ? html`<span>⧄</span>` : html`<span>Not in a team</span>`;
+    if (team === null) return shorthand ? html`<span>⧄</span>` : html`<span>⧄ Not in a team</span>`;
     return html`<span
         x-hl="team:${team}"
         @mouseenter=${startHighlight}
         @mouseleave=${endHighlight}
-    >${shorthand ? (team ? "■" : "□") : (team ? "Team 1": "Team 2")}</span>`;
+    >${shorthand ? (team ? "■" : "□") : (team ? "■ Team 2" : "□ Team 1")}</span>`;
 }
 
 const code = (state, code, team) => {

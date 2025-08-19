@@ -56,6 +56,10 @@ const renderChatMessage = (state, msg) => {
                 return semantic.player(state, player.id);
             }
         }
+        m = tag.match(/^team:(0|1)$/);
+        if (m) {
+            return semantic.team(state, parseInt(m[1]) === 1);
+        }
         if (tag == "br" || tag == "\n") {
             return html`<br>`;
         }

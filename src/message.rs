@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -11,7 +13,9 @@ use crate::{
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FromClient {
-    Auth { secret: Option<UserSecret> },
+    Auth {
+        secret: Option<UserSecret>,
+    },
     SetNick(String),
     CreateLobby,
     JoinLobby(GameId),
@@ -22,7 +26,13 @@ pub enum FromClient {
     SubmitClues(Vec<Clue>),
     SubmitDecipher(Code),
     SubmitIntercept(Code),
-    Frustrated(Inputs),
+    TriggerTimers,
+    Frustrated {
+        /// Is this about guessing or encrypting?
+        encrypting: bool,
+        /// Teams the frustration is about.
+        teams: PerTeam<bool>,
+    },
     GlobalChat(String),
 }
 
@@ -161,10 +171,12 @@ pub enum Inputs {
         deadline: Option<Deadline>,
     },
     WaitingForEncryptors {
+        /// True for teams that are done yet.
         teams: PerTeam<bool>,
         deadline: Option<Deadline>,
     },
     WaitingForGuessers {
+        /// True for teams that are done yet.
         teams: PerTeam<bool>,
         deadline: Option<Deadline>,
     },
@@ -174,20 +186,20 @@ pub enum Inputs {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Deadline {
-    /// Unix timestamp in seconds.
-    pub timestamp: u64,
+    #[serde(with = "serde_millis")]
+    pub at: Instant,
     /// Reason for the deadline.
     pub reason: DeadlineReason,
 }
 
 /// Reason for the deadline.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DeadlineReason {
     /// The deadline is fiex.
     Fixed,
     /// The other team has finished their part.
-    AfterOther,
+    OtherFinished,
     /// Ohter team has clicked the "Hurry up!" button.
-    AfterFrustrated,
+    Frustrated,
 }

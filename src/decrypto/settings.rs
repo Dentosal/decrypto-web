@@ -91,18 +91,19 @@ pub enum ClueMode {
 #[serde(rename_all = "snake_case")]
 pub struct EncryptTimeLimit {
     /// Fixed upper limit.
-    fixed: Option<Duration>,
+    pub fixed: Option<Duration>,
     /// Timer that starts after the team is done.
-    after_other: Option<Duration>,
+    pub after_other: Option<Duration>,
     /// Timer that starts after the team marks frustration.
-    after_frustrated: Duration,
+    pub after_frustrated: Duration,
 }
 impl Default for EncryptTimeLimit {
     fn default() -> Self {
         Self {
             fixed: None,
             after_other: None,
-            after_frustrated: Duration::from_secs(60),
+            // after_frustrated: Duration::from_secs(60),
+            after_frustrated: Duration::from_secs(10),
         }
     }
 }

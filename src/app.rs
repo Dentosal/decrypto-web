@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::format, hash::Hash, option};
+use std::{collections::HashMap, fmt::format, hash::Hash, option, time::Instant};
 
 use axum::extract::ws::WebSocket;
 use futures::{SinkExt, stream::SplitSink};
@@ -11,8 +11,8 @@ use crate::{
     },
     id::{ConnectionId, GameId, UserId, UserSecret},
     message::{
-        ChatMessage, CompletedRoundPerTeam, CurrentRoundPerTeam, ErrorSeverity, FromClient,
-        GameStateView, GameView, Inputs, PlayerInfo, ToClient, UserInfo,
+        ChatMessage, CompletedRoundPerTeam, CurrentRoundPerTeam, Deadline, DeadlineReason,
+        ErrorSeverity, FromClient, GameStateView, GameView, Inputs, PlayerInfo, ToClient, UserInfo,
     },
 };
 
@@ -127,11 +127,10 @@ impl State {
         return None;
     }
 
-    /// Gather latest state view and send it to the user.
-    async fn send_state_to_user(&mut self, user_id: UserId) {
+    fn game_from_user_perspective(&self, user_id: UserId) -> Option<GameView> {
         let user_data = self.users.get(&user_id).expect("Should exist");
 
-        let game = user_data.game.map(|game_id| {
+        user_data.game.map(|game_id| {
             let game_info = self.games.get(&game_id).expect("Should exist");
 
             let mut players: Vec<_> = game_info
@@ -164,6 +163,7 @@ impl State {
                     keywords,
                     completed_rounds,
                     current_round,
+                    deadlines,
                 } => {
                     if let Some(team) = game_info.team_for_user(user_id) {
                         GameStateView::InGame {
@@ -196,16 +196,20 @@ impl State {
                             }),
                             inputs: if let Some(current_round) = current_round {
                                 let is_encryptor = current_round[team].encryptor == user_id;
-                                if current_round.both(|r| r.clues.is_some()) {
+                                if current_round
+                                    .both(|r| r.clues.is_some() || r.timed_out.encrypt.is_some())
+                                {
                                     let decipher =
                                         current_round[team].decipher.is_none() && !is_encryptor;
                                     let intercept = current_round[team].intercept.is_none()
                                         && !completed_rounds.is_empty();
-                                    if decipher || intercept {
+                                    if !current_round[team].timed_out.guess.is_some()
+                                        && (decipher || intercept)
+                                    {
                                         Inputs::Guess {
                                             intercept,
                                             decipher,
-                                            deadline: None,
+                                            deadline: deadlines[team].clone(),
                                         }
                                     } else {
                                         Inputs::WaitingForGuessers {
@@ -214,21 +218,24 @@ impl State {
                                                     || (current_round[team].intercept.is_none()
                                                         && !completed_rounds.is_empty())
                                             }),
-                                            deadline: None,
+                                            deadline: deadlines[team.other()].clone(),
                                         }
                                     }
                                 } else {
-                                    if current_round[team].clues.is_none() && is_encryptor {
+                                    if !current_round[team].timed_out.encrypt.is_some()
+                                        && current_round[team].clues.is_none()
+                                        && is_encryptor
+                                    {
                                         Inputs::Encrypt {
                                             code: current_round[team].code.clone(),
-                                            deadline: None,
+                                            deadline: deadlines[team].clone(),
                                         }
                                     } else {
                                         Inputs::WaitingForEncryptors {
                                             teams: current_round
                                                 .clone()
                                                 .map(|round| round.clues.is_none()),
-                                            deadline: None,
+                                            deadline: deadlines[team.other()].clone(),
                                         }
                                     }
                                 }
@@ -249,7 +256,14 @@ impl State {
                 state,
                 settings: game_info.settings.clone(),
             }
-        });
+        })
+    }
+
+    /// Gather latest state view and send it to the user.
+    async fn send_state_to_user(&mut self, user_id: UserId) {
+        let user_data = self.users.get(&user_id).expect("Should exist");
+
+        let game = self.game_from_user_perspective(user_id);
 
         let state = ToClient::State {
             user_info: UserInfo {
@@ -779,9 +793,99 @@ impl State {
                     Err(())
                 }
             }
-            FromClient::Frustrated(inputs) => {
+            FromClient::TriggerTimers => {
                 let user_id = self.require_auth(id).await?;
                 let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                let GameInfoState::InGame {
+                    current_round,
+                    deadlines,
+                    ..
+                } = &mut game_info.state
+                else {
+                    self.send_error(id, "Game not in progress", ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                };
+                let Some(current_round) = current_round else {
+                    self.send_error(id, "No round in progress", ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                };
+
+                let now = Instant::now();
+
+                let mut any_changes = false;
+                for team in Team::ORDER {
+                    if let Some(deadline) = &deadlines[team] {
+                        if deadline.at < now {
+                            // Deadline has expired, enforce it.
+                            any_changes = true;
+                            current_round[team].timed_out.set_next(deadline.reason);
+                            deadlines[team] = None;
+                            continue;
+                        }
+                    }
+                }
+
+                if any_changes {
+                    self.broadcast_game_state(game_id).await;
+                }
+
+                Ok(())
+            }
+            FromClient::Frustrated { encrypting, teams } => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                let GameInfoState::InGame {
+                    current_round,
+                    deadlines,
+                    ..
+                } = &mut game_info.state
+                else {
+                    self.send_error(id, "Game not in progress", ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                };
+                let Some(current_round) = current_round else {
+                    self.send_error(id, "No round in progress", ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                };
+
+                // IF the current deadline has expired, enforce it.
+                // Otherwise, start the frustration timer.
+
+                let now = Instant::now();
+
+                for team in teams.teams() {
+                    if let Some(deadline) = &deadlines[team] {
+                        if deadline.at < now {
+                            // Deadline has expired, enforce it.
+                            current_round[team].timed_out.set_next(deadline.reason);
+                            deadlines[team] = None;
+                            continue;
+                        }
+                    }
+                    // Start the frustration timer.
+                    deadlines[team] = Some(Deadline {
+                        at: now
+                            + if encrypting {
+                                game_info.settings.encrypt_time_limit.after_frustrated
+                            } else {
+                                game_info.settings.guess_time_limit.after_frustrated
+                            },
+                        reason: DeadlineReason::Frustrated,
+                    });
+                    game_info.global_chat.push(ChatMessage::system(format!(
+                        "<{user_id}> is frustrated with team <{team}>"
+                    )));
+                }
+
+                self.broadcast_game_state(game_id).await;
 
                 Err(())
             }
