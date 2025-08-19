@@ -41,7 +41,7 @@ pub struct UserData {
 
 impl State {
     pub async fn send_to_connection(&mut self, id: ConnectionId, msg: ToClient) {
-        println!("Sending message to client {id:?}: {:?}", msg);
+        log::debug!("Sending message to client {id:?}: {:?}", msg);
         let msg = axum::extract::ws::Message::Text(serde_json::to_string(&msg).unwrap().into());
         let client = self.clients.get_mut(&id).expect("Client should exist");
         let _ = client.outbound.send(msg).await;
@@ -305,14 +305,14 @@ impl State {
             FromClient::Auth { secret } => {
                 let user_id = if let Some(secret) = secret {
                     if let Some(user_id) = self.find_client_by_secret(secret) {
-                        println!("Client {id:?} auth ok, user {user_id:?}");
+                        log::debug!("Client {id:?} auth ok, user {user_id:?}");
                         self.users
                             .get_mut(&user_id)
                             .expect("Should exist")
                             .connection_id = Some(id);
                         Some(user_id)
                     } else {
-                        println!("Client {id:?} secret not recognized");
+                        log::debug!("Client {id:?} secret not recognized");
                         self.send_to_connection(
                             id,
                             ToClient::Error {
@@ -324,7 +324,7 @@ impl State {
                         None
                     }
                 } else {
-                    println!("Client {id:?} auth without secret");
+                    log::debug!("Client {id:?} auth without secret");
                     None
                 };
 
@@ -334,7 +334,7 @@ impl State {
                         // Create a new user with a random secret.
                         let user_id = UserId::new();
                         let secret = UserSecret::new();
-                        println!("Client {id:?} creating new user, id {user_id:?}");
+                        log::debug!("Client {id:?} creating new user, id {user_id:?}");
                         self.users.insert(
                             user_id,
                             UserData {
@@ -401,7 +401,7 @@ impl State {
                 }
 
                 let game_id = GameId::new();
-                println!("Client {id:?} creating a new lobby {game_id:?}");
+                log::debug!("Client {id:?} creating a new lobby {game_id:?}");
 
                 let mut game_info = GameInfo::default();
                 game_info.add_player(user_id);
@@ -411,15 +411,6 @@ impl State {
                 self.games.insert(game_id, game_info);
 
                 self.users.get_mut(&user_id).expect("Should exist").game = Some(game_id);
-
-                // XXX: do we want to keep this? Insert user to white team by default?
-                *self
-                    .games
-                    .get_mut(&game_id)
-                    .expect("Should exist")
-                    .hack_players_mut()
-                    .get_mut(&user_id)
-                    .expect("Should exist") = GamePlayerInfo::InTeam(Team::WHITE);
 
                 self.send_state_to_user(user_id).await;
 
@@ -479,19 +470,6 @@ impl State {
                 } else {
                     game_info.add_player(user_id);
                     self.users.get_mut(&user_id).expect("Should exist").game = Some(game_id);
-
-                    // XXX: do we want to keep this? Insert user to the team with the least players?
-                    let team = if game_info.players_in_team(Team::WHITE).len()
-                        < game_info.players_in_team(Team::BLACK).len()
-                    {
-                        Team::WHITE
-                    } else {
-                        Team::BLACK
-                    };
-                    *game_info
-                        .hack_players_mut()
-                        .get_mut(&user_id)
-                        .expect("Should exist") = GamePlayerInfo::InTeam(team);
                 }
 
                 game_info

@@ -13,7 +13,7 @@ use axum::{
 };
 use futures::stream::StreamExt;
 use parking_lot::Mutex;
-use std::sync::Arc;
+use std::{env, sync::Arc};
 use tower_http::services::ServeDir;
 
 use crate::{id::ConnectionId, message::FromClient};
@@ -25,13 +25,16 @@ mod message;
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     let shared_state = Arc::new(Mutex::new(app::State::default()));
     let static_files = ServeDir::new("./static");
     let app = Router::new()
         .route("/ws", any(ws))
         .with_state(shared_state)
         .fallback_service(static_files);
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let addr = std::env::args().nth(1).unwrap_or("0.0.0.0:3000".to_owned());
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    log::info!("Listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -41,7 +44,7 @@ async fn ws(ws: WebSocketUpgrade, State(state): State<Arc<Mutex<app::State>>>) -
 
 async fn handle_socket(socket: WebSocket, state: Arc<Mutex<app::State>>) {
     let id = ConnectionId::new();
-    println!("Client {id:?} connected");
+    log::info!("Client {id:?} connected");
 
     let (sender, mut receiver) = socket.split();
     {
@@ -51,20 +54,20 @@ async fn handle_socket(socket: WebSocket, state: Arc<Mutex<app::State>>) {
 
     while let Some(msg) = receiver.next().await {
         let Ok(msg) = msg else {
-            println!("Error receiving message or client disconnected");
+            log::warn!("Error receiving message or client disconnected");
             // client disconnected, or perhaps an error occurred
             break;
         };
 
         match msg {
             axum::extract::ws::Message::Text(text) => {
-                println!("Received text message: {}", text);
+                log::debug!("Received text message: {}", text);
                 match serde_json::from_str::<FromClient>(&*text) {
                     Ok(payload) => {
                         let _ = state.lock().on_message(id, payload).await;
                     }
                     Err(_) => {
-                        println!("Failed to parse message: {}", text);
+                        log::warn!("Failed to parse message: {}", text);
                         let _ = state
                             .lock()
                             .send_to_connection(
@@ -80,21 +83,15 @@ async fn handle_socket(socket: WebSocket, state: Arc<Mutex<app::State>>) {
                 }
             }
             axum::extract::ws::Message::Binary(_) => {
-                println!("Received binary message, not supported");
+                log::warn!("Received binary message, not supported");
                 break;
             }
             axum::extract::ws::Message::Close(_) => {
-                println!("Client disconnected");
+                log::info!("Client disconnected");
                 break;
             }
             _ => {}
         }
-
-        // if socket.send(msg).await.is_err() {
-        //     println!("Error sending message or client disconnected");
-        //     // client disconnected
-        //     return;
-        // }
     }
 
     let mut state = state.lock();
