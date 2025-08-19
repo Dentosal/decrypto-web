@@ -23,8 +23,7 @@ const connect = () => {
     state.ws.addEventListener('message', onMessage);
     state.ws.addEventListener('open', () => {
         console.log("WebSocket connection established");
-        // send({ auth: { secret: localStorage.getItem('secret') || null } });
-        send({ auth: { secret: null } }); // xxx
+        send({ auth: { secret: localStorage.getItem('secret') || null } });
     });
     state.ws.addEventListener('error', e => {
         console.error("WebSocket error:", e);
@@ -88,24 +87,20 @@ const viewNickRequired = () => {
         }
     };
 
-    // xxx: dev helper, remove this later
-    send({ set_nick: "auto"+Math.random().toString(16).slice(2) });
-    return html`setting randomnick...`;
-
-    // return html`
-    // <div>
-    //     <p>Select a nickname:</p>
-    //     <input
-    //         id="nick-input"
-    //         type="text"
-    //         placeholder="Nickname"
-    //         .value=${state.nickname_input}
-    //         @input=${onInput}
-    //         @keypress=${onKeyPress}
-    //         autofocus
-    //     />
-    // </div>
-    // `;
+    return html`
+    <div>
+        <p>Select a nickname:</p>
+        <input
+            id="nick-input"
+            type="text"
+            placeholder="Nickname"
+            .value=${state.nickname_input}
+            @input=${onInput}
+            @keypress=${onKeyPress}
+            autofocus
+        />
+    </div>
+    `;
 };
 
 const createLobby = () => {
@@ -119,7 +114,7 @@ const viewNotInLobby = () => {
         To join a lobby, please use a link sent by the host.
         </div>
         <br>
-        <input type="button" @click=${createLobby} value="Create lobby">
+        <input type="button" @click=${createLobby} id="create-lobby" value="Create lobby">
     </div>
     `;
 };

@@ -29,10 +29,11 @@ export default function viewInGame(state) {
                 @click=${() => state.send({ leave_lobby: null })}
             />
         </h1>
-        <p>Invite link: <a href="${window.location.origin}/#join_${state.game.id}">${window.location.origin}/#join_${state.game.id}</a></p>
+        <p>Invite link: <a id="invite-link" href="${window.location.origin}/#join_${state.game.id}">${window.location.origin}/#join_${state.game.id}</a></p>
         <p>
             <input
                 type="button"
+                id="start-game"
                 value="Start game"
                 ?disabled=${state.game.lobby.reason_not_startable}
                 @click=${() => state.send({ start_game: null })}
@@ -51,6 +52,7 @@ export default function viewInGame(state) {
                     <input
                         type="button"
                         value="Join"
+                        id="join-team-1"
                         @click=${() => state.send({ join_team: false })}
                     />
                 </h3>
@@ -62,6 +64,7 @@ export default function viewInGame(state) {
                     <input
                         type="button"
                         value="Join"
+                        id="join-team-2"
                         @click=${() => state.send({ join_team: true })}
                     />
                 </h3>

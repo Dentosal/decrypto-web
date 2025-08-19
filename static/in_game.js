@@ -19,7 +19,10 @@ const renderClueInput = (state, idx) => {
             type="text"
             placeholder="Clue"
             .value=${state.clue_inputs[idx]?.text || ''}
-            @input=${(e) => state.clue_inputs[idx] = { text: e.target.value }}
+            @input=${(e) => {
+                state.clue_inputs[idx] = { text: e.target.value };
+                state.update();
+            }}
         />
         `);
     }
@@ -40,7 +43,6 @@ const renderClueInput = (state, idx) => {
         <td>${input}</td>
     </tr>
     `;
-
 }
 
 const renderClue = (state, clue) => {
@@ -62,15 +64,8 @@ const submitClues = (state) => {
             console.warn(`Clue input ${i} is empty, skipping`);
         }
     }
-
-    console.log("Submitting clues:", data);
-    if (data.length === 0) { // XXX: dev mode: submit keywords as clues
-        for (let code_part of state.game.in_game.inputs.encrypt.code) {
-            data.push({text : state.game.in_game.keywords[code_part]});
-        }
-        console.warn("Clues empty, submitting keywords instead:", data);
-    }
     state.send({ submit_clues: data })
+    state.clue_inputs = [];
 }
 
 const renderHurryUp = (state, deadline) => {
@@ -205,22 +200,12 @@ const renderIntercept = (state) => {
 }
 
 const renderAction = (state) => {
-    // State cleanup
-    if (state.game.in_game.phase !== 'encrypt') {
-        state.clue_inputs = [];
-    };
-    if (state.game.in_game.phase !== 'decipher') {
-        state.decipher_input = '';
-    };
-    if (state.game.in_game.phase !== 'intercept') {
-        state.intercept_input = '';
-    };
-
     let myTeam = state.game.players.find(p => p.id === state.user_info.id).team;
     
     if ('encrypt' in state.game.in_game.inputs) {
         let code = state.game.in_game.inputs.encrypt.code;
         let deadline = state.game.in_game.inputs.encrypt.deadline;
+        let disabled = Object.keys(state.clue_inputs).length !== code.length || state.clue_inputs.some(c => !c.text);
         return html`
         <div class="input-action">
             <h1>It's your turn to give clues!</h1>
@@ -231,8 +216,10 @@ const renderAction = (state) => {
                 ${code.map(num => renderClueInput(state, num))}
             </table>
             <input
+                id="submit-clues"
                 type="button"
                 value="Proceed"
+                ?disabled=${disabled}
                 @click=${() => submitClues(state)}
             />
             ${renderDeadline(state, deadline)}

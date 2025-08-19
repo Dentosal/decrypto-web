@@ -20,16 +20,22 @@ const endHighlight = e => {
 const player = (state, playerId) => {
     let player = state.game.players.find(p => p.id === playerId);
     return html`<span
+        class="semantic-mention"
         x-mention="${player.id}"
         x-hl="player:${player.id}"
         @mouseenter=${startHighlight}
         @mouseleave=${endHighlight}
-    >${team(state, player.team, true)}${player.team !== null ? " "  : ""}${player.nick}</span>`;
+    >${team(state, player.team, true)}${player.team !== null ? " "  : ""}<span
+        class="semantic-nick">${player.nick}</
+    span></span>`;
 }
 
 const team = (state, team, shorthand) => {
-    if (team === null) return shorthand ? html`<span>⧄</span>` : html`<span>⧄ Not in a team</span>`;
+    if (team === null) {
+        return html`<span class="semantic-team" x-hl="team:null">${shorthand ? '⧄' : '⧄ Not in a team'}</span>`;
+    }
     return html`<span
+        class="semantic-team"
         x-hl="team:${team}"
         @mouseenter=${startHighlight}
         @mouseleave=${endHighlight}
@@ -43,6 +49,7 @@ const code = (state, code, team) => {
 
 const round = (state, index) => {
     return html`<span
+        class="semantic-round"
         x-hl="round:${index}"
         @mouseenter=${startHighlight}
         @mouseleave=${endHighlight}
@@ -51,6 +58,7 @@ const round = (state, index) => {
 
 const result = (state, result) => {
     return html`<span
+        class="semantic-result"
         x-result="${result}"
         x-hl="result:${result}"
         @mouseenter=${startHighlight}
