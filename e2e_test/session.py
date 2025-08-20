@@ -4,6 +4,7 @@ import time
 import platform
 
 import portpicker
+import pytest
 import requests
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options

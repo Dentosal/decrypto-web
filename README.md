@@ -33,11 +33,11 @@ Install deps with
 
 ```bash
 brew install geckodriver
-python3 -m pip install pytest requests selenium portpicker
+python3 -m pip install pytest pytest-xdist requests selenium portpicker
 ```
 
 and the run
 
 ```bash
-python3 -m pytest
+python3 -m pytest -n 4
 ```
