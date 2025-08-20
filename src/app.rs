@@ -12,7 +12,7 @@ use crate::{
     },
     id::{ConnectionId, GameId, UserId, UserSecret},
     message::{
-        ChatMessage, CompletedRoundPerTeam, CurrentRoundPerTeam, Deadline, DeadlineReason,
+        ChatMessage, Clue, CompletedRoundPerTeam, CurrentRoundPerTeam, Deadline, DeadlineReason,
         ErrorSeverity, FromClient, GameStateView, GameView, Inputs, PlayerInfo,
         TiebreakerInputSubmission, ToClient, UserInfo,
     },
@@ -496,7 +496,7 @@ impl State {
                             }
                             GamePlayerInfo::InTeam(team) => {
                                 panic!(
-                                    "Invaraint violation: user {user_id} already in team {team:?} in game {game_id:?}"
+                                    "Invariant violation: user {user_id} already in team {team:?} in game {game_id:?}"
                                 );
                             }
                             GamePlayerInfo::LeftGame(None) => {
@@ -680,7 +680,12 @@ impl State {
 
                         // Success.
                         game_info.global_chat.push(ChatMessage::system(format!(
-                            "<{user_id}> submitted clues {clues:?}"
+                            "<{user_id}> submitted clues {}",
+                            clues
+                                .iter()
+                                .map(|clue| format!("{clue}"))
+                                .collect::<Vec<_>>()
+                                .join(", ")
                         )));
                         current_round[team].clues = Some(clues);
                         self.broadcast_game_state(game_id).await;

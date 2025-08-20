@@ -559,7 +559,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Team 1: {}\nTeam 2: {}",
+            "<team:0>: {}\n<team:1>: {}",
             self[Team::WHITE],
             self[Team::BLACK]
         )

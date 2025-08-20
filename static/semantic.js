@@ -66,10 +66,33 @@ const result = (state, result) => {
     >${result === null ? "N/A" : (result ? "success" : "fail")}</span>`;
 }
 
+const clueText = (state, text) => {
+    return html`<span
+        class="semantic-clue-text"
+        x-clue-text="${text}"
+        x-hl="clue-text:${text}"
+        @mouseenter=${startHighlight}
+        @mouseleave=${endHighlight}
+    >${text}</span>`;
+}
+
+const clueImage = (state, imageId) => {
+    return html`<img
+        class="semantic-clue-image"
+        x-clue-image="${imageId}"
+        x-hl="clue-image:${imageId}"
+        @mouseenter=${startHighlight}
+        @mouseleave=${endHighlight}
+        src="/clueimage/${imageId}"
+    >`;
+}
+
 export default {
     player,
     team,
     code,
     round,
     result,
+    clueText,
+    clueImage,
 };

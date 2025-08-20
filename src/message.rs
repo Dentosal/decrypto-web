@@ -1,3 +1,4 @@
+use core::fmt;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -168,6 +169,15 @@ pub enum ErrorSeverity {
 pub enum Clue {
     Text(String),
     Image(Uuid),
+}
+
+impl fmt::Display for Clue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Clue::Text(text) => write!(f, "<clue:text:{text}>"),
+            Clue::Image(id) => write!(f, "<clue:image:{id}>"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
