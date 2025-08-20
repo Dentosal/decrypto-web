@@ -5,6 +5,7 @@ import topbar from './topbar.js';
 import sidebar from './sidebar.js';
 
 const state = {
+    version: null,
     ws: null,
     user_info: null,
     game: null,
@@ -78,7 +79,7 @@ const send = (msg) => {
     state.ws.send(JSON.stringify(msg));
 }
     
-const viewNickRequired = () => {
+const viewNickRequired = state => {
     const onInput = (e) => {
         state.nickname_input = e.target.value;
     };
@@ -90,7 +91,7 @@ const viewNickRequired = () => {
     };
 
     return html`
-    <div>
+    <div id="nick-required">
         <p>Select a nickname:</p>
         <input
             id="nick-input"
@@ -123,7 +124,7 @@ const viewNotInLobby = () => {
 
 const currentView = () => {
     if (!state.user_info?.nick || state.override_view === 'nick_required') {
-        return viewNickRequired();
+        return html`${[topbar(state), viewNickRequired(state)]}`;
     }
 
     if (window.location.hash.startsWith('#join_')) {
@@ -166,6 +167,7 @@ state.send = send;
 
 document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById('init-load').innnerText = 'Initializing...';
+    state.version = await ((await fetch('/version')).json());
     state.wordlists = await ((await fetch('/wordlists')).json());
 
     document.getElementById('init-load').innnerText = 'Connecting...';
