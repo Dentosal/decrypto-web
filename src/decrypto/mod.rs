@@ -213,11 +213,10 @@ impl GameInfo {
                     && (r.intercept.is_some() || completed_rounds.is_empty()))
                     || r.timed_out.guess.is_some())
         });
-        if is_done { self.next_round() } else { None }
-    }
+        if !is_done {
+            return None;
+        }
 
-    #[must_use]
-    fn next_round(&mut self) -> Option<PerTeam<RoundResult>> {
         let players_in_teams = PerTeam::from(Team::ORDER.map(|team| self.players_in_team(team)));
         let GameInfoState::InGame {
             keywords,

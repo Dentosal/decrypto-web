@@ -49,7 +49,7 @@ const onMessage = event => {
     if (msg.state) {
         state.user_info = msg.state.user_info;
         state.game = msg.state.game;
-        // localStorage.setItem('secret', state.user_info.secret);
+        localStorage.setItem('secret', state.user_info.secret);
         update();
     }
     if (msg.error) {

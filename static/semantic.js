@@ -44,7 +44,12 @@ const team = (state, team, shorthand) => {
 
 const code = (state, code, team) => {
     if (code === null) return html`<span>N/A</span>`;
-    return html`<span>${code.map(c => c + 1).join("-")}</span>`;
+    return html`<span
+        class="semantic-code"
+        x-hl="code:team=${team}:${code.join(',')}"
+        @mouseenter=${startHighlight}
+        @mouseleave=${endHighlight}
+    >${code.map(c => c + 1).join("-")}</span>`;
 }
 
 const round = (state, index) => {

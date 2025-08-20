@@ -11,16 +11,16 @@ const renderKeywords = (state) => {
     </div>`;
 }
 
-const renderClueInput = (state, idx) => {
+const renderClueInput = (state, keywordIndex, clueIndex) => {
     let input = [];
     if (state.game.settings.clue_mode !== 'draw') {
         input.push(html`
         <input
             type="text"
             placeholder="Clue"
-            .value=${state.clue_inputs[idx]?.text || ''}
+            .value=${state.clue_inputs[clueIndex]?.text || ''}
             @input=${(e) => {
-                state.clue_inputs[idx] = { text: e.target.value };
+                state.clue_inputs[clueIndex] = { text: e.target.value };
                 state.update();
             }}
         />
@@ -38,8 +38,8 @@ const renderClueInput = (state, idx) => {
 
     return html`
     <tr>
-        <td>${idx + 1}.</td>
-        <td>${state.game.keywords[idx]}</td>
+        <td>${keywordIndex + 1}.</td>
+        <td>${state.game.keywords[clueIndex]}</td>
         <td>${input}</td>
     </tr>
     `;
@@ -279,7 +279,7 @@ const renderAction = (state) => {
             Code: ${code.map((num) => num + 1).join('-')} (for ${code.map((num) => state.game.keywords[num]).join(', ')})
             </div>
             <table class="clue-inputs">
-                ${code.map(num => renderClueInput(state, num))}
+                ${code.map((keywordIndex, clueIndex) => renderClueInput(state, keywordIndex, clueIndex))}
             </table>
             <input
                 id="submit-clues"
@@ -446,7 +446,7 @@ const renderRoundHistory = state => {
                     <td>
                         ${semantic.code(state, round[+!myTeam].decipher, !myTeam)}
                         <hr>
-                        ${semantic.result(state, round[+!!myTeam].score.decipher)}
+                        ${semantic.result(state, round[+!myTeam].score.decipher)}
                     </td>
                     <td>
                         ${semantic.code(state, round[+!myTeam].intercept, !myTeam)}
