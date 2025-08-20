@@ -19,25 +19,27 @@ Game rules explained: https://www.youtube.com/watch?v=2DBg7Z2-pQ4&t=114s
 
 ## Dev
 
-## Running multiple browser windows with separate localStorage instances
-
-```bash
-/Applications/Firefox\ Nightly.app/Contents/MacOS/firefox --profile $(mktemp -d) --private-window
-```
-
-### Running e2e tests
+### Setup
 
 This assumes macOS. Requires Firefox to be installed. Should be quite easy to adapt for others though.
 
-Install deps with
-
 ```bash
 brew install geckodriver
-python3 -m pip install pytest pytest-xdist requests selenium portpicker
+python3 -m pip install pytest pytest-xdist requests types-requests selenium portpicker types-portpicker mypy
+cargo install cargo-make
+carog make install-git-hooks
 ```
 
-and the run
+### Commands
 
 ```bash
-python3 -m pytest -n 4
+cargo make fmt
+cargo make check
+cargo make test
+```
+
+### Running multiple browser windows with separate localStorage instances
+
+```bash
+/Applications/Firefox\ Nightly.app/Contents/MacOS/firefox --profile $(mktemp -d) --private-window
 ```
