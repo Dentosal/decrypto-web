@@ -1,6 +1,7 @@
-# Decrypto web ui, but slightly improved
+# Decrypto web ui, but slightly improved [![CI](https://github.com/Dentosal/decrypto-web/actions/workflows/ci.yml/badge.svg)](https://github.com/Dentosal/decrypto-web/actions/workflows/ci.yml)
 
-Original rules can be found here: http://www.scorpionmasque.com/sites/scorpionmasque.com/files/decrypto_en_rules_20sep2019.pdf
+Rulebook: http://www.scorpionmasque.com/sites/scorpionmasque.com/files/decrypto_en_rules_20sep2019.pdf
+
 Game rules explained: https://www.youtube.com/watch?v=2DBg7Z2-pQ4&t=114s
 
 ## TODO
