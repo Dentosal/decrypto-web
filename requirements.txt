@@ -1,8 +1,9 @@
+black
+mypy
+portpicker
 pytest
 pytest-xdist
 requests
-types-requests
 selenium
-portpicker
 types-portpicker
-mypy
+types-requests
