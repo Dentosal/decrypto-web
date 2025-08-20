@@ -1,0 +1,8 @@
+pytest
+pytest-xdist
+requests
+types-requests
+selenium
+portpicker
+types-portpicker
+mypy

@@ -32,11 +32,15 @@ args = ["-m", "black", ".", "--check"]
 
 # check
 [tasks.check]
-dependencies = ["cargo-check", "deno-check", "python-check"]
+dependencies = ["cargo-check", "cargo-clippy", "deno-check", "python-check"]
 
 [tasks.cargo-check]
 command = "cargo"
 args = ["check"]
+
+[tasks.cargo-clippy]
+command = "cargo"
+args = ["clippy"]
 
 [tasks.deno-check]
 command = "deno"

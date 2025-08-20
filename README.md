@@ -24,8 +24,8 @@ Game rules explained: https://www.youtube.com/watch?v=2DBg7Z2-pQ4&t=114s
 This assumes macOS. Requires Firefox to be installed. Should be quite easy to adapt for others though.
 
 ```bash
-brew install geckodriver
-python3 -m pip install pytest pytest-xdist requests types-requests selenium portpicker types-portpicker mypy
+brew install geckodriver deno
+python3 -m pip install 
 cargo install cargo-make
 carog make install-git-hooks
 ```
