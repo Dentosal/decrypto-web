@@ -25,27 +25,27 @@ const connect = () => {
     state.ws = new WebSocket('/ws');
     state.ws.addEventListener('message', onMessage);
     state.ws.addEventListener('open', () => {
-        console.log("WebSocket connection established");
+        console.log('WebSocket connection established');
         send({ auth: { secret: localStorage.getItem('secret') || null } });
     });
-    state.ws.addEventListener('error', e => {
-        console.error("WebSocket error:", e);
+    state.ws.addEventListener('error', (e) => {
+        console.error('WebSocket error:', e);
         document.getElementById('error').innerText = e.message;
-        document.getElementById('error').classList.remove("severity-info");
-        document.getElementById('error').classList.remove("severity-warning");
-        document.getElementById('error').classList.add("severity-error");
+        document.getElementById('error').classList.remove('severity-info');
+        document.getElementById('error').classList.remove('severity-warning');
+        document.getElementById('error').classList.add('severity-error');
     });
-    state.ws.addEventListener('close', e => {
-        document.getElementById('error').innerText = "Server closed connection unexpectedly " + e.reason;
-        document.getElementById('error').classList.remove("severity-info");
-        document.getElementById('error').classList.remove("severity-warning");
-        document.getElementById('error').classList.add("severity-error");
+    state.ws.addEventListener('close', (e) => {
+        document.getElementById('error').innerText = 'Server closed connection unexpectedly ' + e.reason;
+        document.getElementById('error').classList.remove('severity-info');
+        document.getElementById('error').classList.remove('severity-warning');
+        document.getElementById('error').classList.add('severity-error');
     });
 };
 
-const onMessage = event => {
+const onMessage = (event) => {
     const msg = JSON.parse(event.data);
-    console.log("recv: " + JSON.stringify(msg));
+    console.log('recv: ' + JSON.stringify(msg));
     if (msg.state) {
         state.user_info = msg.state.user_info;
         state.game = msg.state.game;
@@ -58,28 +58,30 @@ const onMessage = event => {
         state.error = msg.error;
         state.error.id = id;
         document.getElementById('error').innerText = state.error.message;
-        document.getElementById('error').classList.remove("severity-info");
-        document.getElementById('error').classList.remove("severity-warning");
-        document.getElementById('error').classList.remove("severity-error");
-        document.getElementById('error').classList.add("severity-" + state.error.severity);
+        document.getElementById('error').classList.remove('severity-info');
+        document.getElementById('error').classList.remove('severity-warning');
+        document.getElementById('error').classList.remove('severity-error');
+        document.getElementById('error').classList.add(
+            'severity-' + state.error.severity,
+        );
         setTimeout(() => {
             if (state.error.id !== id) return; // ignore if error has changed
             state.error = null;
             document.getElementById('error').innerText = '';
-            document.getElementById('error').classList.remove("severity-info");
-            document.getElementById('error').classList.remove("severity-warning");
-            document.getElementById('error').classList.remove("severity-error");
+            document.getElementById('error').classList.remove('severity-info');
+            document.getElementById('error').classList.remove('severity-warning');
+            document.getElementById('error').classList.remove('severity-error');
         }, 5000);
     }
 };
 
 const send = (msg) => {
     if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return; // TODO: show error
-    console.log("send: " + JSON.stringify(msg));
+    console.log('send: ' + JSON.stringify(msg));
     state.ws.send(JSON.stringify(msg));
-}
-    
-const viewNickRequired = state => {
+};
+
+const viewNickRequired = (state) => {
     const onInput = (e) => {
         state.nickname_input = e.target.value;
     };
@@ -108,7 +110,7 @@ const viewNickRequired = state => {
 
 const createLobby = () => {
     send({ create_lobby: null });
-}
+};
 
 const viewNotInLobby = () => {
     return html`
@@ -144,16 +146,19 @@ const currentView = () => {
         } else {
             view = viewInGame;
         }
-        return html`${topbar(state)}<div class="sidebar-split">${[view(state), sidebar(state)]}</div>`;
+        return html`${topbar(state)}<div class="sidebar-split">${[
+            view(state),
+            sidebar(state),
+        ]}</div>`;
     }
 
     return html`${[topbar(state), viewNotInLobby(state)]}`;
-}
+};
 
 const update = () => {
     render(currentView(), document.getElementById('app'));
     // Auto-focus on nickname input if it's visible
-    document.getElementById("nick-input")?.focus();
+    document.getElementById('nick-input')?.focus();
     // Auto-scroll to bottom of messages
     // TODO: only do this if new messages were added
     for (const el of document.querySelectorAll('.messages')) {
@@ -165,7 +170,7 @@ const update = () => {
 state.update = update;
 state.send = send;
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('init-load').innnerText = 'Initializing...';
     state.version = await ((await fetch('/version')).json());
     state.wordlists = await ((await fetch('/wordlists')).json());
@@ -175,14 +180,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById('init-load').remove();
     update();
 
-    setInterval(_ => {
-        document.querySelectorAll('[x-deadline]').forEach(el => {
+    setInterval((_) => {
+        document.querySelectorAll('[x-deadline]').forEach((el) => {
             let deadline = el.getAttribute('x-deadline');
             if (deadline) {
                 let secondsLeft = Math.floor((parseInt(deadline) - Date.now()) / 1000);
                 if (secondsLeft < 0) {
                     secondsLeft = 0;
-                    let inputs = state.game?.in_game?.inputs
+                    let inputs = state.game?.in_game?.inputs;
                     if (inputs !== null) {
                         state.send({ trigger_timers: null });
                     }

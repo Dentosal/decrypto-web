@@ -7,16 +7,16 @@ const kickButton = (state, playerId) => {
             Kick
         </button>
     `;
-}
+};
 
 const renderPlayer = (state, player) => {
     return html`
         <div class="player">
             ${semantic.player(state, player.id)}
-            ${player.connected ? null : ["(disconnected", kickButton(state, player.id), ")"]}
+            ${player.connected ? null : ['(disconnected', kickButton(state, player.id), ')']}
         </div>
     `;
-}
+};
 
 export default function viewInGame(state) {
     return html`
@@ -44,7 +44,7 @@ export default function viewInGame(state) {
         <div id="lobby-teams" class="row wrap">
             <div>
                 <h3>No team selected</h3>
-                ${state.game.players.filter(p => p.is_in_game && p.team === null).map(p => renderPlayer(state, p))}
+                ${state.game.players.filter((p) => p.is_in_game && p.team === null).map((p) => renderPlayer(state, p))}
             </div>
             <div>
                 <h3>
@@ -56,7 +56,11 @@ export default function viewInGame(state) {
                         @click=${() => state.send({ join_team: false })}
                     />
                 </h3>
-                ${state.game.players.filter(p => p.is_in_game && p.team === false).map(p => renderPlayer(state, p))}
+                ${
+        state.game.players.filter((p) => p.is_in_game && p.team === false).map(
+            (p) => renderPlayer(state, p),
+        )
+    }
             </div>
             <div>
                 <h3>
@@ -68,17 +72,21 @@ export default function viewInGame(state) {
                         @click=${() => state.send({ join_team: true })}
                     />
                 </h3>
-                ${state.game.players.filter(p => p.is_in_game && p.team === true).map(p => renderPlayer(state, p))}
+                ${state.game.players.filter((p) => p.is_in_game && p.team === true).map((p) => renderPlayer(state, p))}
             </div>
         </div>
         <h2>Settings</h2>
         <h3>Wordlist</h3>
-        <select id="wordlist-select" @change=${e => {
-                let settings = JSON.parse(JSON.stringify(state.game.settings));
-                settings.wordlist = e.target.value;
-                state.send({ change_settings: settings });
-            }}>
-            ${state.wordlists.map(wl => html`<option value="${wl}" ?selected=${wl === state.game.settings.wordlist}>${wl}</option>`)}
+        <select id="wordlist-select" @change=${(e) => {
+        let settings = JSON.parse(JSON.stringify(state.game.settings));
+        settings.wordlist = e.target.value;
+        state.send({ change_settings: settings });
+    }}>
+            ${
+        state.wordlists.map((wl) =>
+            html`<option value="${wl}" ?selected=${wl === state.game.settings.wordlist}>${wl}</option>`
+        )
+    }
         </select>
         TODO: custom wordlists
         <h3>Other settings</h3>

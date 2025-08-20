@@ -7,32 +7,36 @@ const kickButton = (state, playerId) => {
             Kick
         </button>
     `;
-}
+};
 
 const renderPlayer = (state, player) => {
     return html`
         <div class="player">
             <span class="nick">${semantic.player(state, player.id)}</span>
-            ${player.connected ? null : ["(disconnected", kickButton(state, player.id), ")"]}
+            ${player.connected ? null : ['(disconnected', kickButton(state, player.id), ')']}
         </div>
     `;
-}
+};
 
-const renderPlayerList = state => {
+const renderPlayerList = (state) => {
     return html`
     <div class="player-list row wrap">
         <div>
-            ${state.game.players.filter(p => p.is_in_game && p.team === false).map(p => renderPlayer(state, p))}
+            ${
+        state.game.players.filter((p) => p.is_in_game && p.team === false).map(
+            (p) => renderPlayer(state, p),
+        )
+    }
         </div>
         <div>
-            ${state.game.players.filter(p => p.is_in_game && p.team === true).map(p => renderPlayer(state, p))}
+            ${state.game.players.filter((p) => p.is_in_game && p.team === true).map((p) => renderPlayer(state, p))}
         </div>
         <div>
-            ${state.game.players.filter(p => p.is_in_game && p.team === null).map(p => renderPlayer(state, p))}
+            ${state.game.players.filter((p) => p.is_in_game && p.team === null).map((p) => renderPlayer(state, p))}
         </div>
     </div>
     `;
-}
+};
 
 const renderChatMessage = (state, msg) => {
     // Parse tag syntax like <@user_id>
@@ -40,18 +44,18 @@ const renderChatMessage = (state, msg) => {
     let text = msg.text.replace(/<(.+?)>|\n/g, (match, tag) => {
         let i = tags.length;
         if (match === '\n') {
-            tags.push("br");
+            tags.push('br');
         } else {
             tags.push(tag);
         }
-        return "<" + i + ">";
+        return '<' + i + '>';
     });
     text = text.split(/<.+?>/g);
 
-    tags = tags.map(tag => {
+    tags = tags.map((tag) => {
         let m = tag.match(/^\@([0-9a-f-]+)$/);
         if (m) {
-            let player = state.game.players.find(p => p.id === m[1]);
+            let player = state.game.players.find((p) => p.id === m[1]);
             if (player) {
                 return semantic.player(state, player.id);
             }
@@ -68,13 +72,13 @@ const renderChatMessage = (state, msg) => {
         if (m) {
             return semantic.clueImage(state, m[1]);
         }
-        if (tag == "br" || tag == "\n") {
+        if (tag == 'br' || tag == '\n') {
             return html`<br>`;
         }
-        return "<" + tag + ">"; // Note: this is not html, but a string literal
+        return '<' + tag + '>'; // Note: this is not html, but a string literal
     });
 
-    console.assert(text.length === tags.length + 1, "Text and tags mismatch");
+    console.assert(text.length === tags.length + 1, 'Text and tags mismatch');
 
     let rendered = [];
     for (let i = 0; i < text.length; i++) {
@@ -87,23 +91,23 @@ const renderChatMessage = (state, msg) => {
     return html`
     <div class="chat-message row ${msg.author === null ? 'system-msg' : 'user-msg'}">
         <span class="author">
-            ${msg.author === null ? '' : state.game.players.find(p => p.id === msg.author).nick}
+            ${msg.author === null ? '' : state.game.players.find((p) => p.id === msg.author).nick}
         </span>
         <span class="content">
             ${rendered}
         </span>
     </div>
     `;
-}
+};
 
-const renderGlobalChat = state => {
+const renderGlobalChat = (state) => {
     const onKeyPress = (e) => {
         if (e.key === 'Enter') {
             let text = state.global_chat_input.trim();
             if (text.length > 0) {
                 state.send({ global_chat: text });
-                state.global_chat_input = "";
-                e.target.value = ""; // Clear input field
+                state.global_chat_input = '';
+                e.target.value = ''; // Clear input field
             }
         }
     };
@@ -112,9 +116,7 @@ const renderGlobalChat = state => {
     <div class="global-chat column">
         <h3>Global Chat</h3>
         <div class="messages column" style="justify-content: flex-start">
-            ${
-                state.game.global_chat.map(msg => renderChatMessage(state, msg))
-            }
+            ${state.game.global_chat.map((msg) => renderChatMessage(state, msg))}
         </div>
         <input
             type="text"
@@ -125,7 +127,7 @@ const renderGlobalChat = state => {
         />
     </div>
     `;
-}
+};
 
 export default function sidebar(state) {
     return html`

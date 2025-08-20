@@ -53,18 +53,22 @@ div {
     background-color: rgba(240, 128, 128, 0.9);
 }
 
-
 body, input {
-    font-family: ui-monospace,
-        Menlo, Monaco,
-        "Cascadia Mono", "Segoe UI Mono",
-        "Roboto Mono",
-        "Oxygen Mono",
-        "Ubuntu Mono",
-        "Source Code Pro",
-        "Fira Mono",
-        "Droid Sans Mono",
-        "Consolas", "Courier New", monospace;
+    font-family:
+        ui-monospace,
+        Menlo,
+        Monaco,
+        'Cascadia Mono',
+        'Segoe UI Mono',
+        'Roboto Mono',
+        'Oxygen Mono',
+        'Ubuntu Mono',
+        'Source Code Pro',
+        'Fira Mono',
+        'Droid Sans Mono',
+        'Consolas',
+        'Courier New',
+        monospace;
 }
 
 body {
@@ -200,7 +204,7 @@ body {
 }
 
 .matrix td {
-    padding: 5px
+    padding: 5px;
 }
 
 .col-clue {
@@ -225,7 +229,7 @@ body {
 }
 .history table {
     border-collapse: separate;
-    border-spacing: 0;;
+    border-spacing: 0;
     border-radius: 5px;
     text-align: center;
     width: 100%;
