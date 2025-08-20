@@ -322,6 +322,8 @@ impl State {
             .await;
     }
 
+    /// Broadcast the current game state to all users in the game.
+    /// Removes the game if all users have disconnected.
     async fn broadcast_game_state(&mut self, game_id: GameId) {
         let users_in_game: Vec<_> = self
             .games
@@ -331,17 +333,28 @@ impl State {
             .keys()
             .copied()
             .collect();
-        for user_id in users_in_game {
+        let mut any_user_connected = false;
+        for user_id in &users_in_game {
             if self
                 .users
-                .get(&user_id)
+                .get(user_id)
                 .expect("Should exist")
                 .connection_id
                 .is_none()
             {
                 continue; // Don't send state to users that are not connected.
             }
-            self.send_state_to_user(user_id).await;
+            self.send_state_to_user(*user_id).await;
+            any_user_connected = true;
+        }
+        if !any_user_connected {
+            // If no user is connected, remove the game.
+            log::debug!("Removing game {game_id:?} because no users are connected");
+            for user_id in users_in_game {
+                let user_data = self.users.get_mut(&user_id).expect("Should exist");
+                user_data.game = None; // Clear game reference for users.
+            }
+            self.games.remove(&game_id);
         }
     }
 
