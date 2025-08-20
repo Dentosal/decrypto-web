@@ -182,9 +182,9 @@ const renderIntercept = (state) => {
         <div class="input-action">
             <h1>Attempt interception:</h1>
             ${
-                state.game.current_round[+myTeam].clues === null
-                ? html`<li>Encryptor ran out of time, no clues for you.</li>`
-                : state.game.current_round[+myTeam].clues.map(clue => html`<li>${renderClue(state, clue)}</li>`)
+                state.game.current_round[+!myTeam].clues === null
+                ? html`<li>Encryptor ran out of time, nothing to intercept.</li>`
+                : state.game.current_round[+!myTeam].clues.map(clue => html`<li>${renderClue(state, clue)}</li>`)
             }
             <input
                 type="text"
