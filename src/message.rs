@@ -226,7 +226,7 @@ impl TiebreakerInputSubmission {
         Self {
             guess: guess.to_owned(),
             correct: correct.to_owned(),
-            is_correct: check_tiebreaker_guess(&guess, &correct),
+            is_correct: check_tiebreaker_guess(guess, correct),
         }
     }
 }

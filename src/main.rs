@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
+#![allow(clippy::large_enum_variant)]
 #![deny(unused_must_use)]
 
 use axum::{
@@ -13,8 +14,8 @@ use axum::{
     routing::{any, get},
 };
 use futures::stream::StreamExt;
-use parking_lot::Mutex;
 use std::{env, fs, sync::Arc};
+use tokio::sync::Mutex;
 use tower_http::services::ServeDir;
 
 use crate::{decrypto::settings::available_wordlists, id::ConnectionId, message::FromClient};
@@ -77,7 +78,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<Mutex<app::State>>) {
 
     let (sender, mut receiver) = socket.split();
     {
-        let mut state = state.lock();
+        let mut state = state.lock().await;
         state.on_connect(id, sender).await;
     }
 
@@ -91,14 +92,15 @@ async fn handle_socket(socket: WebSocket, state: Arc<Mutex<app::State>>) {
         match msg {
             axum::extract::ws::Message::Text(text) => {
                 log::debug!("Received text message: {}", text);
-                match serde_json::from_str::<FromClient>(&*text) {
+                match serde_json::from_str::<FromClient>(&text) {
                     Ok(payload) => {
-                        let _ = state.lock().on_message(id, payload).await;
+                        let _ = state.lock().await.on_message(id, payload).await;
                     }
                     Err(_) => {
                         log::warn!("Failed to parse message: {}", text);
                         let _ = state
                             .lock()
+                            .await
                             .send_to_connection(
                                 id,
                                 message::ToClient::Error {
@@ -123,6 +125,6 @@ async fn handle_socket(socket: WebSocket, state: Arc<Mutex<app::State>>) {
         }
     }
 
-    let mut state = state.lock();
+    let mut state = state.lock().await;
     state.on_disconnect(id).await;
 }

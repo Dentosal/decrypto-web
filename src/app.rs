@@ -63,7 +63,7 @@ impl State {
         .await;
     }
 
-    #[must_use]
+    #[must_use = "Never discard error here, as it signals that the user is not authenticated"]
     async fn require_auth(&mut self, connnection_id: ConnectionId) -> Result<UserId, ()> {
         if let Some(user_id) = self
             .clients
@@ -79,7 +79,7 @@ impl State {
         }
     }
 
-    #[must_use]
+    #[must_use = "Never discard error here, as it signals that the user is not in a game"]
     async fn require_game(
         &mut self,
         connnection_id: ConnectionId,
@@ -122,11 +122,11 @@ impl State {
     fn find_client_by_secret(&mut self, secret: UserSecret) -> Option<UserId> {
         for (user_id, user_data) in &self.users {
             if user_data.secret == secret {
-                debug_assert!(self.users.get(user_id).is_some());
+                debug_assert!(self.users.contains_key(user_id));
                 return Some(*user_id);
             }
         }
-        return None;
+        None
     }
 
     fn game_from_user_perspective(&self, user_id: UserId) -> Option<GameView> {
@@ -148,10 +148,7 @@ impl State {
                             GamePlayerInfo::InTeam(team) => Some(*team),
                             _ => None,
                         },
-                        is_in_game: match info {
-                            GamePlayerInfo::LeftGame(_) => false,
-                            _ => true,
-                        },
+                        is_in_game: !matches!(info, GamePlayerInfo::LeftGame(_)),
                     }
                 })
                 .collect();
@@ -209,7 +206,7 @@ impl State {
                                             current_round[team].decipher.is_none() && !is_encryptor;
                                         let intercept = current_round[team].intercept.is_none()
                                             && !completed_rounds.is_empty();
-                                        if !current_round[team].timed_out.guess.is_some()
+                                        if current_round[team].timed_out.guess.is_none()
                                             && (decipher || intercept)
                                         {
                                             Inputs::Guess {
@@ -227,22 +224,20 @@ impl State {
                                                 deadline: deadlines[team.other()].clone(),
                                             }
                                         }
+                                    } else if current_round[team].timed_out.encrypt.is_none()
+                                        && current_round[team].clues.is_none()
+                                        && is_encryptor
+                                    {
+                                        Inputs::Encrypt {
+                                            code: current_round[team].code.clone(),
+                                            deadline: deadlines[team].clone(),
+                                        }
                                     } else {
-                                        if !current_round[team].timed_out.encrypt.is_some()
-                                            && current_round[team].clues.is_none()
-                                            && is_encryptor
-                                        {
-                                            Inputs::Encrypt {
-                                                code: current_round[team].code.clone(),
-                                                deadline: deadlines[team].clone(),
-                                            }
-                                        } else {
-                                            Inputs::WaitingForEncryptors {
-                                                teams: current_round
-                                                    .clone()
-                                                    .map(|round| round.clues.is_none()),
-                                                deadline: deadlines[team.other()].clone(),
-                                            }
+                                        Inputs::WaitingForEncryptors {
+                                            teams: current_round
+                                                .clone()
+                                                .map(|round| round.clues.is_none()),
+                                            deadline: deadlines[team.other()].clone(),
                                         }
                                     }
                                 }
@@ -260,7 +255,7 @@ impl State {
                                                     .map(|(i, g)| {
                                                         g.as_ref().map(|guess| {
                                                             TiebreakerInputSubmission::new(
-                                                                &guess,
+                                                                guess,
                                                                 &keywords[team.other()][i],
                                                             )
                                                         })
@@ -318,7 +313,7 @@ impl State {
         let state = ToClient::State {
             user_info: UserInfo {
                 id: user_id,
-                secret: user_data.secret.clone(),
+                secret: user_data.secret,
                 nick: user_data.nick.clone(),
             },
             game,

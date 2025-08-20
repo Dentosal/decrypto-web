@@ -171,11 +171,10 @@ impl GameInfo {
                 |team| {
                     RoundPerTeam {
                         // Pick a random encryptor for the team.
-                        encryptor: self
+                        encryptor: *self
                             .players_in_team(team)
                             .choose(&mut rand::rng())
-                            .expect("There should be at least one player in each team")
-                            .clone(),
+                            .expect("There should be at least one player in each team"),
                         code: self.settings.make_random_code(),
                         clues: None,
                         decipher: None,
@@ -285,7 +284,7 @@ impl GameInfo {
             let next_i = (prev_i + 1) % players.len();
 
             RoundPerTeam {
-                encryptor: players[next_i].clone(),
+                encryptor: players[next_i],
                 code: self.settings.make_random_code(),
                 clues: None,
                 decipher: None,
@@ -510,10 +509,10 @@ impl PerTeam<RoundPerTeam> {
                 None => true,
             };
 
-            let intercept = match self[team].intercept.as_ref() {
-                Some(attempt) => Some(*attempt == self[team.other()].code),
-                None => None,
-            };
+            let intercept = self[team]
+                .intercept
+                .as_ref()
+                .map(|attempt| *attempt == self[team.other()].code);
 
             RoundResult {
                 intercept,
