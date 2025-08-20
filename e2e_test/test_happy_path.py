@@ -75,7 +75,7 @@ def start_game_if_possible(driver):
     except NoSuchElementException:
         pass
 
-def do_input_actions(driver):
+def do_input_actions(driver) -> bool:
     try:
         for ia in driver.find_elements(By.CSS_SELECTOR, "div.input-action"):
             try:
@@ -113,10 +113,22 @@ def do_input_actions(driver):
                     textbox.clear()
             elif "Waiting for" in h1:
                 pass
+            elif "Tiebreaker" in h1:
+                for textbox in ia.find_elements(By.CSS_SELECTOR, "input[type=text]"):
+                    if textbox.get_attribute("value") == "":
+                        textbox.send_keys("I guess, nope")
+                        textbox.send_keys(Keys.ENTER)
+                        time.sleep(0.1)
+                        break
+                    else:
+                        textbox.clear()
+            elif "Game Over" in h1:
+                return True
             else:
                 raise ValueError(f"Unexpected input action: {h1}")
     except StaleElementReferenceException:
         return
+    return False
 
 def simple_player(index: int, port: int, shared: SharedState):
     driver = new_isolated_firefox()
@@ -141,7 +153,10 @@ def simple_player(index: int, port: int, shared: SharedState):
             if index == 0:
                 start_game_if_possible(driver)
 
-            do_input_actions(driver)
+            is_game_over = do_input_actions(driver)
+            if is_game_over:
+                time.sleep(100) # XXX
+                break
             time.sleep(0.5)
     except:
         shared.stop_event.set()

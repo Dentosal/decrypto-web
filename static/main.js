@@ -13,6 +13,7 @@ const state = {
     intercept_input: '',
     global_chat_input: '',
     clue_inputs: [],
+    tiebreaker_inputs: [],
     override_view: null,
     error: null,
     error_expires: null,
@@ -136,7 +137,7 @@ const currentView = () => {
 
     if (state.game) {
         let view;
-        if ("lobby" in state.game) {
+        if (state.game.state === 'lobby') {
             view = viewLobby;
         } else {
             view = viewInGame;

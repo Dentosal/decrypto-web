@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 use crate::{
     decrypto::{
-        Code, PerTeam, Role, Round, RoundPerTeam, RoundResult, Team, TiebreakerRound,
-        settings::GameSettings,
+        Code, PerTeam, Role, Round, RoundPerTeam, RoundResult, Team, TiebreakerRound, TimedOut,
+        check_tiebreaker_guess, settings::GameSettings,
     },
     id::{GameId, UserId, UserSecret},
 };
@@ -27,7 +27,10 @@ pub enum FromClient {
     SubmitClues(Vec<Clue>),
     SubmitDecipher(Code),
     SubmitIntercept(Code),
-    SubmitTiebreaker(Vec<String>),
+    SubmitTiebreaker {
+        index: usize,
+        guess: String,
+    },
     TriggerTimers,
     Frustrated {
         /// Is this about guessing or encrypting?
@@ -89,7 +92,7 @@ pub struct GameView {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", tag = "state")]
 pub enum GameStateView {
     Lobby {
         reason_not_startable: Option<String>,
@@ -106,6 +109,7 @@ pub enum GameStateView {
     },
     /// Game is over, all info is public.
     GameOver {
+        winner: Option<Team>,
         keywords: PerTeam<Vec<String>>,
         completed_rounds: Vec<PerTeam<CompletedRoundPerTeam>>,
         tiebreaker: Option<TiebreakerRound>,
@@ -190,10 +194,30 @@ pub enum Inputs {
     },
     Tiebreaker {
         teams_done: PerTeam<bool>,
+        submitted: PerTeam<Vec<Option<TiebreakerInputSubmission>>>,
         deadline: Option<Deadline>,
     },
     /// Game is over, only input is moving back to the lobby.
     GameOver,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct TiebreakerInputSubmission {
+    pub guess: String,
+    /// The actual keyword of the other team.
+    pub correct: String,
+    /// Whether the guess was correct.
+    pub is_correct: bool,
+}
+impl TiebreakerInputSubmission {
+    pub fn new(guess: &str, correct: &str) -> Self {
+        Self {
+            guess: guess.to_owned(),
+            correct: correct.to_owned(),
+            is_correct: check_tiebreaker_guess(&guess, &correct),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -8,12 +8,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     decrypto::{
         GameInfo, GameInfoState, GameInfoStateCurrentRound, GamePlayerInfo, GameState, PerTeam,
-        Team, settings::GameSettings,
+        Team, check_tiebreaker_guess, settings::GameSettings,
     },
     id::{ConnectionId, GameId, UserId, UserSecret},
     message::{
         ChatMessage, CompletedRoundPerTeam, CurrentRoundPerTeam, Deadline, DeadlineReason,
-        ErrorSeverity, FromClient, GameStateView, GameView, Inputs, PlayerInfo, ToClient, UserInfo,
+        ErrorSeverity, FromClient, GameStateView, GameView, Inputs, PlayerInfo,
+        TiebreakerInputSubmission, ToClient, UserInfo,
     },
 };
 
@@ -247,7 +248,26 @@ impl State {
                                 }
                                 GameInfoStateCurrentRound::Tiebreaker(round) => {
                                     Inputs::Tiebreaker {
-                                        teams_done: round.as_ref().map(|t| t.guess.is_some()),
+                                        teams_done: round
+                                            .as_ref()
+                                            .map(|t| t.guesses.iter().all(|g| g.is_some())),
+                                        submitted: Team::ORDER
+                                            .map(|team| {
+                                                round[team]
+                                                    .guesses
+                                                    .iter()
+                                                    .enumerate()
+                                                    .map(|(i, g)| {
+                                                        g.as_ref().map(|guess| {
+                                                            TiebreakerInputSubmission::new(
+                                                                &guess,
+                                                                &keywords[team.other()][i],
+                                                            )
+                                                        })
+                                                    })
+                                                    .collect()
+                                            })
+                                            .into(),
                                         deadline: deadlines[team].clone(),
                                     }
                                 }
@@ -258,10 +278,12 @@ impl State {
                     }
                 }
                 GameInfoState::GameOver {
+                    winner,
                     keywords,
                     completed_rounds,
                     tiebreaker,
                 } => GameStateView::GameOver {
+                    winner: *winner,
                     keywords: keywords.clone(),
                     completed_rounds: completed_rounds
                         .iter()
@@ -811,7 +833,7 @@ impl State {
                     Err(())
                 }
             }
-            FromClient::SubmitTiebreaker(guess) => {
+            FromClient::SubmitTiebreaker { index, guess } => {
                 let user_id = self.require_auth(id).await?;
                 let game_id = self.require_game(id, user_id).await?;
 
@@ -833,8 +855,15 @@ impl State {
                         return Err(());
                     };
 
+                    // Validate index.
+                    if index >= game_info.settings.keyword_count {
+                        self.send_error(id, "Invalid index", ErrorSeverity::Info)
+                            .await;
+                        return Err(());
+                    }
+
                     // Check for resubmission.
-                    if round[team].guess.is_some() {
+                    if round[team].guesses[index].is_some() {
                         // Already submitted, cannot submit again.
                         self.send_error(
                             id,
@@ -846,8 +875,13 @@ impl State {
                     }
 
                     // Success.
-                    round[team].guess = Some(guess);
-                    let _ = game_info.next_round_if_ready();
+                    round[team].guesses[index] = Some(guess);
+                    let scores = game_info.tiebreaker_over_if_ready();
+                    if let Some(scores) = scores {
+                        game_info.global_chat.push(ChatMessage::system(format!(
+                            "Tiebreaker ended, scores:\n{scores}",
+                        )));
+                    }
                     self.broadcast_game_state(game_id).await;
                     Ok(())
                 } else {
@@ -880,7 +914,14 @@ impl State {
                         if deadline.at < now {
                             // Deadline has expired, enforce it.
                             any_changes = true;
-                            current_round.timed_out_mut()[team].set_next(deadline.reason);
+                            match current_round {
+                                GameInfoStateCurrentRound::Normal(r) => {
+                                    r[team].timed_out.set_next(deadline.reason)
+                                }
+                                GameInfoStateCurrentRound::Tiebreaker(r) => {
+                                    r[team].timed_out = Some(deadline.reason)
+                                }
+                            }
                             deadlines[team] = None;
                             continue;
                         }
@@ -917,7 +958,14 @@ impl State {
                     if let Some(deadline) = &deadlines[team] {
                         if deadline.at < now {
                             // Deadline has expired, enforce it.
-                            current_round.timed_out_mut()[team].set_next(deadline.reason);
+                            match current_round {
+                                GameInfoStateCurrentRound::Normal(r) => {
+                                    r[team].timed_out.set_next(deadline.reason)
+                                }
+                                GameInfoStateCurrentRound::Tiebreaker(r) => {
+                                    r[team].timed_out = Some(deadline.reason)
+                                }
+                            }
                             deadlines[team] = None;
                             continue;
                         }

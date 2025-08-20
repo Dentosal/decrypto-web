@@ -3,6 +3,7 @@ use std::{
     fmt,
     ops::{Index, IndexMut},
     time::Instant,
+    vec,
 };
 
 use rand::{Rng, seq::IndexedRandom};
@@ -202,10 +203,10 @@ impl GameInfo {
         else {
             panic!("Cannot proceed to next round in non-in-game state");
         };
+
         let GameInfoStateCurrentRound::Normal(current_round) = current_round else {
             panic!("Cannot proceed to next round in tiebreaker state");
         };
-
         let is_done = current_round.both(|r| {
             (r.clues.is_some() || r.timed_out.encrypt.is_some())
                 && ((r.decipher.is_some()
@@ -230,35 +231,33 @@ impl GameInfo {
         };
 
         // Move current round to completed rounds.
-        let ended_round = match current_round {
-            GameInfoStateCurrentRound::Normal(current_round) => current_round.clone(),
-            GameInfoStateCurrentRound::Tiebreaker(tiebreaker) => {
-                self.state = GameInfoState::GameOver {
-                    keywords: keywords.clone(),
-                    completed_rounds: completed_rounds.clone(),
-                    tiebreaker: Some(tiebreaker.clone()),
-                };
-                return None;
-            }
+        let GameInfoStateCurrentRound::Normal(ended_round) = current_round else {
+            panic!("Cannot proceed to next round in tiebreaker state");
         };
         completed_rounds.push(ended_round.clone());
         let score = ended_round.score();
 
-        // Check if either team lost.
-        let team_lost =
-            aggregate_scores(completed_rounds.iter().map(|rt| rt.score())).map(|score| {
-                score.intercepts >= self.settings.intercept_limit
-                    || score.miscommunications >= self.settings.miscommunication_limit
-            });
-        if team_lost.either(|b| *b) {
-            if team_lost.both(|b| *b) {
+        // Check if score-based win conditions are met.
+        let aggr = aggregate_scores(completed_rounds.iter().map(|rt| rt.score()));
+        let intercept_win = aggr.map(|score| score.intercepts >= self.settings.intercept_limit);
+        let miscommunication_loss =
+            aggr.map(|score| score.miscommunications >= self.settings.miscommunication_limit);
+
+        if intercept_win.either(|b| *b) || miscommunication_loss.either(|b| *b) {
+            // Game is over, but it require a tiebreaker, if scores don't differ
+            let [a, b] = aggr.map(|score| score.total()).0;
+            if a == b {
                 let keywords = keywords.clone();
                 let completed_rounds = completed_rounds.clone();
                 self._start_tiebreaker(keywords, completed_rounds);
                 return Some(score);
             }
+
+            let winner = if a > b { Team::WHITE } else { Team::BLACK };
+
             // If one team lost, move to game over state.
             self.state = GameInfoState::GameOver {
+                winner: Some(winner),
                 keywords: keywords.clone(),
                 completed_rounds: completed_rounds.clone(),
                 tiebreaker: None,
@@ -320,8 +319,8 @@ impl GameInfo {
             completed_rounds,
             current_round: GameInfoStateCurrentRound::Tiebreaker(TiebreakerRound::from(
                 Team::ORDER.map(|_| TiebreakerRoundPerTeam {
-                    guess: None,
-                    timed_out: TimedOut::default(),
+                    guesses: vec![None; self.settings.keyword_count],
+                    timed_out: None,
                 }),
             )),
             deadlines: PerTeam::from_fn(|_| {
@@ -334,6 +333,56 @@ impl GameInfo {
                     })
             }),
         };
+    }
+
+    #[must_use]
+    pub fn tiebreaker_over_if_ready(&mut self) -> Option<PerTeam<usize>> {
+        let GameInfoState::InGame {
+            keywords,
+            completed_rounds,
+            current_round,
+            ..
+        } = &mut self.state
+        else {
+            panic!("Cannot proceed to next round in non-in-game state");
+        };
+
+        let GameInfoStateCurrentRound::Tiebreaker(tiebreaker) = current_round else {
+            panic!("Tiebreaker is not in progress");
+        };
+
+        if !tiebreaker.both(|r| r.guesses.iter().all(|g| g.is_some()) || r.timed_out.is_some()) {
+            return None;
+        }
+
+        let scores = Team::ORDER.map(|team| {
+            tiebreaker[team]
+                .guesses
+                .iter()
+                .zip(keywords[team.other()].iter())
+                .filter(|(guess, correct)| {
+                    guess
+                        .as_ref()
+                        .map(|guess| check_tiebreaker_guess(guess, correct))
+                        .unwrap_or(false)
+                })
+                .count()
+        });
+
+        self.state = GameInfoState::GameOver {
+            winner: if scores[0] > scores[1] {
+                Some(Team::WHITE)
+            } else if scores[0] < scores[1] {
+                Some(Team::BLACK)
+            } else {
+                None
+            },
+            keywords: keywords.clone(),
+            completed_rounds: completed_rounds.clone(),
+            tiebreaker: Some(tiebreaker.clone()),
+        };
+
+        Some(scores.into())
     }
 }
 
@@ -377,6 +426,7 @@ pub enum GameInfoState {
     },
     /// Game over, results are available.
     GameOver {
+        winner: Option<Team>,
         keywords: PerTeam<Vec<String>>,
         completed_rounds: Vec<Round>,
         tiebreaker: Option<TiebreakerRound>,
@@ -387,16 +437,6 @@ pub enum GameInfoState {
 pub enum GameInfoStateCurrentRound {
     Normal(Round),
     Tiebreaker(TiebreakerRound),
-}
-impl GameInfoStateCurrentRound {
-    pub fn timed_out_mut(&mut self) -> PerTeam<&mut TimedOut> {
-        match self {
-            GameInfoStateCurrentRound::Normal(round) => round.as_mut().map(|r| &mut r.timed_out),
-            GameInfoStateCurrentRound::Tiebreaker(round) => {
-                round.as_mut().map(|r| &mut r.timed_out)
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -490,6 +530,11 @@ pub struct AggregateScore {
     pub miscommunications: usize,
     pub intercepts: usize,
 }
+impl AggregateScore {
+    pub fn total(&self) -> i32 {
+        self.intercepts as i32 - self.miscommunications as i32
+    }
+}
 
 fn aggregate_scores(it: impl Iterator<Item = PerTeam<RoundResult>>) -> PerTeam<AggregateScore> {
     it.fold(
@@ -499,8 +544,7 @@ fn aggregate_scores(it: impl Iterator<Item = PerTeam<RoundResult>>) -> PerTeam<A
         }),
         |acc, round| {
             PerTeam(Team::ORDER.map(|team| AggregateScore {
-                miscommunications: acc[team].miscommunications
-                    + if round[team].decipher { 0 } else { 1 },
+                miscommunications: acc[team].miscommunications + (!round[team].decipher) as usize,
                 intercepts: acc[team].intercepts
                     + round[team].intercept.map(|b| b as usize).unwrap_or(0),
             }))
@@ -537,14 +581,6 @@ pub struct RoundPerTeam {
     pub timed_out: TimedOut,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct TiebreakerRoundPerTeam {
-    /// `None` if the team ran out of time, or has not given clues yet.
-    pub guess: Option<Vec<String>>,
-    pub timed_out: TimedOut,
-}
-
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct TimedOut {
@@ -561,4 +597,16 @@ impl TimedOut {
             panic!("Cannot set more than two timeouts");
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct TiebreakerRoundPerTeam {
+    /// `None` if the team ran out of time, or has not given clues yet.
+    pub guesses: Vec<Option<String>>,
+    pub timed_out: Option<DeadlineReason>,
+}
+
+pub fn check_tiebreaker_guess(guess: &str, correct: &str) -> bool {
+    guess.trim().eq_ignore_ascii_case(correct.trim())
 }

@@ -24,11 +24,11 @@ pub struct GameSettings {
     /// Miscommunication limit before losing.
     /// Default 2. Min 1. Max `round_limit - 1`.
     pub miscommunication_limit: usize,
-    /// When to do tiebreaker round.
-    pub tiebreaker: Tiebreaker,
     /// Intercept limit before winning, default 2.
     /// Default 2. Min 1. Max `round_limit - 2`.
     pub intercept_limit: usize,
+    /// When to do tiebreaker round.
+    pub tiebreaker: Tiebreaker,
     /// Timer for encryptors to encrypt clues.
     pub encrypt_time_limit: EncryptTimeLimit,
     /// Time to decide decipher and intercept attempts.

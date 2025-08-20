@@ -35,10 +35,10 @@ export default function viewInGame(state) {
                 type="button"
                 id="start-game"
                 value="Start game"
-                ?disabled=${state.game.lobby.reason_not_startable}
+                ?disabled=${state.game.reason_not_startable}
                 @click=${() => state.send({ start_game: null })}
             />
-            ${state.game.lobby.reason_not_startable ? html`(${state.game.lobby.reason_not_startable})` : ''}
+            ${state.game.reason_not_startable ? html`(${state.game.reason_not_startable})` : ''}
         </p>
         <h2>Teams</h2>
         <div id="lobby-teams" class="row wrap">

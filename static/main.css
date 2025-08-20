@@ -259,3 +259,7 @@ span[x-hl] {
 span[x-hl].highlight {
     background-color: rgba(255, 255, 230, 0.9);
 }
+
+.tiebreaker-inputs td {
+    padding: 5px 10px;
+}
