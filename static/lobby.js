@@ -72,9 +72,18 @@ export default function viewInGame(state) {
             </div>
         </div>
         <h2>Settings</h2>
-        TODO: settings editor
-        <pre><code>${JSON.stringify(state.game.settings, null, 2)}</code></pre>
+        <h3>Wordlist</h3>
+        <select id="wordlist-select" @change=${e => {
+                let settings = JSON.parse(JSON.stringify(state.game.settings));
+                settings.wordlist = e.target.value;
+                state.send({ change_settings: settings });
+            }}>
+            ${state.wordlists.map(wl => html`<option value="${wl}" ?selected=${wl === state.game.settings.wordlist}>${wl}</option>`)}
+        </select>
         TODO: custom wordlists
+        <h3>Other settings</h3>
+        TODO: proper settings editor
+        <pre><code>${JSON.stringify(state.game.settings, null, 2)}</code></pre>
     </div>
     `;
 }

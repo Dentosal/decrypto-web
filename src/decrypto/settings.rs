@@ -1,4 +1,4 @@
-use std::{array, collections::HashMap, time::Duration};
+use std::{array, collections::HashMap, fs, time::Duration};
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,8 @@ pub struct GameSettings {
     /// How clues are given.
     pub clue_mode: ClueMode,
     /// Keyword list to use for the game.
-    pub keyword_list: KeywordList,
+    /// `/wordlists` returns a list of available wordlists.
+    pub wordlist: String,
     /// Miscommunication limit before losing.
     /// Default 2. Min 1. Max `round_limit - 1`.
     pub miscommunication_limit: usize,
@@ -43,7 +44,7 @@ impl Default for GameSettings {
             keyword_count: 4,
             clue_count: 3,
             clue_mode: Default::default(),
-            keyword_list: Default::default(),
+            wordlist: "original".to_string(),
             miscommunication_limit: 2,
             intercept_limit: 2,
             tiebreaker: Tiebreaker::default(),
@@ -87,6 +88,11 @@ impl GameSettings {
                 self.keyword_count
             ));
         }
+
+        if !available_wordlists().contains(&self.wordlist) {
+            return Err(format!("Wordlist '{}' does not exist", self.wordlist));
+        }
+
         Ok(())
     }
 
@@ -99,13 +105,51 @@ impl GameSettings {
     }
 
     pub fn pick_random_keywords(&self) -> PerTeam<Vec<String>> {
-        let mut keywords = self.keyword_list.load();
+        let mut keywords = self.load_wordlist();
         assert!(keywords.len() >= self.keyword_count);
 
         keywords.shuffle(&mut rand::rng());
         keywords.truncate(self.keyword_count * 2);
         let other = keywords.split_off(self.keyword_count);
         PerTeam::from([keywords, other])
+    }
+
+    pub fn load_wordlist(&self) -> Vec<String> {
+        assert!(
+            available_wordlists().contains(&self.wordlist),
+            "Wordlist '{}' does not exist",
+            self.wordlist
+        );
+        let path = format!("./wordlists/{}.txt", self.wordlist);
+        let Ok(wordlist) = fs::read_to_string(path) else {
+            return vec![];
+        };
+        wordlist
+            .lines()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+}
+
+pub fn available_wordlists() -> Vec<String> {
+    match fs::read_dir("./wordlists") {
+        Ok(entries) => entries
+            .flatten()
+            .filter_map(|entry| {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                        file_name.strip_suffix(".txt").map(|s| s.to_owned())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect(),
+        Err(_) => vec![],
     }
 }
 
@@ -152,26 +196,6 @@ impl Default for GuessTimeLimit {
         Self {
             fixed: None,
             after_frustrated: Duration::from_secs(60),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum KeywordList {
-    /// Use the default decrypto word list.
-    #[default]
-    Default,
-}
-
-impl KeywordList {
-    pub fn load(&self) -> Vec<String> {
-        match self {
-            KeywordList::Default => std::fs::read_to_string("wordlists/default.txt")
-                .expect("Failed to read keywords file")
-                .lines()
-                .map(|line| line.trim().to_string())
-                .collect(),
         }
     }
 }

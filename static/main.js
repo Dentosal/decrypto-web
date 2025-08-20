@@ -17,6 +17,7 @@ const state = {
     override_view: null,
     error: null,
     error_expires: null,
+    wordlists: null,
 };
 
 const connect = () => {
@@ -163,7 +164,10 @@ const update = () => {
 state.update = update;
 state.send = send;
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    document.getElementById('init-load').innnerText = 'Initializing...';
+    state.wordlists = await ((await fetch('/wordlists')).json());
+
     document.getElementById('init-load').innnerText = 'Connecting...';
     connect();
     document.getElementById('init-load').remove();

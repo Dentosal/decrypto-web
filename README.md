@@ -4,9 +4,17 @@ Original rules can be found here: https://cdn.1j1ju.com/medias/fb/0d/f3-decrypto
 
 ## TODO
 
-* Support draring: https://brush.ninja/create/drawing/
+* Mini chat below intercept matrix to for guessing
+* Show own team interception matrix optionally
+* Settings editor
+* Cusotm wordlists
+* Support drawing: https://brush.ninja/create/drawing/
 * Support webauthn between devices to move sessions?
-* Tests
+* Persist user sessions across server restarts
+* More e2e tests
+* More validation rules
+* LLM player support
+* LLM-based tiebreaker judge
 
 ## Dev
 

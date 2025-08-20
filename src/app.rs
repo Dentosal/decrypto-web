@@ -602,6 +602,32 @@ impl State {
                 self.broadcast_game_state(game_id).await;
                 Ok(())
             }
+            FromClient::ChangeSettings(settings) => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                if !matches!(game_info.state, GameInfoState::Lobby) {
+                    self.send_error(
+                        id,
+                        "Cannot change settings while in game",
+                        ErrorSeverity::Info,
+                    )
+                    .await;
+                    return Err(());
+                }
+
+                if let Err(err) = settings.validate() {
+                    self.send_error(id, format!("Invalid settings: {err}"), ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                }
+
+                game_info.settings = settings;
+
+                self.broadcast_game_state(game_id).await;
+                Ok(())
+            }
             FromClient::StartGame => {
                 let user_id = self.require_auth(id).await?;
                 let game_id = self.require_game(id, user_id).await?;

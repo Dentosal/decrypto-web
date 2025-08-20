@@ -24,6 +24,7 @@ pub enum FromClient {
     LeaveLobby,
     JoinTeam(Team),
     Kick(UserId),
+    ChangeSettings(GameSettings),
     StartGame,
     SubmitClues(Vec<Clue>),
     SubmitDecipher(Code),

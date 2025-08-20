@@ -8,15 +8,16 @@ use axum::{
         State,
         ws::{WebSocket, WebSocketUpgrade},
     },
-    response::Response,
+    http::StatusCode,
+    response::{IntoResponse, Response},
     routing::{any, get},
 };
 use futures::stream::StreamExt;
 use parking_lot::Mutex;
-use std::{env, sync::Arc};
+use std::{env, fs, sync::Arc};
 use tower_http::services::ServeDir;
 
-use crate::{id::ConnectionId, message::FromClient};
+use crate::{decrypto::settings::available_wordlists, id::ConnectionId, message::FromClient};
 
 mod app;
 mod decrypto;
@@ -31,11 +32,23 @@ async fn main() {
     let app = Router::new()
         .route("/ws", any(ws))
         .with_state(shared_state)
+        .route("/wordlists", get(get_wordlists))
         .fallback_service(static_files);
     let addr = std::env::args().nth(1).unwrap_or("0.0.0.0:3000".to_owned());
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     log::info!("Listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
+}
+
+pub async fn get_wordlists() -> Response {
+    let mut wordlists = available_wordlists();
+
+    wordlists.sort();
+    if let Some(i) = wordlists.iter().position(|s| s == "original") {
+        wordlists.swap(0, i);
+    }
+
+    axum::Json(serde_json::json!(wordlists)).into_response()
 }
 
 async fn ws(ws: WebSocketUpgrade, State(state): State<Arc<Mutex<app::State>>>) -> Response {
