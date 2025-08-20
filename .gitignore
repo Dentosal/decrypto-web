@@ -1,5 +1,7 @@
 /target
 __pycache__
+.mypy_cache
+.pytest_cache
 
 deno.lock
 Cargo.lock
