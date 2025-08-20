@@ -5,7 +5,8 @@ use uuid::Uuid;
 
 use crate::{
     decrypto::{
-        Code, PerTeam, Role, Round, RoundPerTeam, RoundResult, Team, settings::GameSettings,
+        Code, PerTeam, Role, Round, RoundPerTeam, RoundResult, Team, TiebreakerRound,
+        settings::GameSettings,
     },
     id::{GameId, UserId, UserSecret},
 };
@@ -26,6 +27,7 @@ pub enum FromClient {
     SubmitClues(Vec<Clue>),
     SubmitDecipher(Code),
     SubmitIntercept(Code),
+    SubmitTiebreaker(Vec<String>),
     TriggerTimers,
     Frustrated {
         /// Is this about guessing or encrypting?
@@ -95,12 +97,18 @@ pub enum GameStateView {
     InGame {
         /// Complete rounds (public info).
         completed_rounds: Vec<PerTeam<CompletedRoundPerTeam>>,
-        /// Current round (public info).
+        /// Current round (partially public info). None if the game is in tiebreaker state.
         current_round: Option<PerTeam<CurrentRoundPerTeam>>,
         /// Keywords for this team (private info).
         keywords: Vec<String>,
         /// Inputs for the current player
         inputs: Inputs,
+    },
+    /// Game is over, all info is public.
+    GameOver {
+        keywords: PerTeam<Vec<String>>,
+        completed_rounds: Vec<PerTeam<CompletedRoundPerTeam>>,
+        tiebreaker: Option<TiebreakerRound>,
     },
     /// The game is in progress, but you're not in a team.
     InGameNotInTeam,
@@ -180,7 +188,12 @@ pub enum Inputs {
         teams: PerTeam<bool>,
         deadline: Option<Deadline>,
     },
-    RoundNotActive,
+    Tiebreaker {
+        teams_done: PerTeam<bool>,
+        deadline: Option<Deadline>,
+    },
+    /// Game is over, only input is moving back to the lobby.
+    GameOver,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

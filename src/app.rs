@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     decrypto::{
-        GameInfo, GameInfoState, GamePlayerInfo, GameState, PerTeam, Team, settings::GameSettings,
+        GameInfo, GameInfoState, GameInfoStateCurrentRound, GamePlayerInfo, GameState, PerTeam,
+        Team, settings::GameSettings,
     },
     id::{ConnectionId, GameId, UserId, UserSecret},
     message::{
@@ -178,75 +179,102 @@ impl State {
                                     })
                                 })
                                 .collect(),
-                            current_round: current_round.as_ref().map(|round| {
-                                PerTeam::from_fn(|t| CurrentRoundPerTeam {
-                                    encryptor: round[t].encryptor,
-                                    clues: round[t].clues.clone(),
-                                    decipher: if t == team {
-                                        round[t].decipher.clone()
-                                    } else {
-                                        None
-                                    },
-                                    intercept: if t == team {
-                                        round[t].intercept.clone()
-                                    } else {
-                                        None
-                                    },
-                                })
-                            }),
-                            inputs: if let Some(current_round) = current_round {
-                                let is_encryptor = current_round[team].encryptor == user_id;
-                                if current_round
-                                    .both(|r| r.clues.is_some() || r.timed_out.encrypt.is_some())
-                                {
-                                    let decipher =
-                                        current_round[team].decipher.is_none() && !is_encryptor;
-                                    let intercept = current_round[team].intercept.is_none()
-                                        && !completed_rounds.is_empty();
-                                    if !current_round[team].timed_out.guess.is_some()
-                                        && (decipher || intercept)
-                                    {
-                                        Inputs::Guess {
-                                            intercept,
-                                            decipher,
-                                            deadline: deadlines[team].clone(),
+                            current_round: match current_round {
+                                GameInfoStateCurrentRound::Normal(round) => {
+                                    Some(PerTeam::from_fn(|t| CurrentRoundPerTeam {
+                                        encryptor: round[t].encryptor,
+                                        clues: round[t].clues.clone(),
+                                        decipher: if t == team {
+                                            round[t].decipher.clone()
+                                        } else {
+                                            None
+                                        },
+                                        intercept: if t == team {
+                                            round[t].intercept.clone()
+                                        } else {
+                                            None
+                                        },
+                                    }))
+                                }
+                                _ => None,
+                            },
+                            inputs: match current_round {
+                                GameInfoStateCurrentRound::Normal(current_round) => {
+                                    let is_encryptor = current_round[team].encryptor == user_id;
+                                    if current_round.both(|r| {
+                                        r.clues.is_some() || r.timed_out.encrypt.is_some()
+                                    }) {
+                                        let decipher =
+                                            current_round[team].decipher.is_none() && !is_encryptor;
+                                        let intercept = current_round[team].intercept.is_none()
+                                            && !completed_rounds.is_empty();
+                                        if !current_round[team].timed_out.guess.is_some()
+                                            && (decipher || intercept)
+                                        {
+                                            Inputs::Guess {
+                                                intercept,
+                                                decipher,
+                                                deadline: deadlines[team].clone(),
+                                            }
+                                        } else {
+                                            Inputs::WaitingForGuessers {
+                                                teams: PerTeam::from_fn(|team| {
+                                                    current_round[team].decipher.is_none()
+                                                        || (current_round[team].intercept.is_none()
+                                                            && !completed_rounds.is_empty())
+                                                }),
+                                                deadline: deadlines[team.other()].clone(),
+                                            }
                                         }
                                     } else {
-                                        Inputs::WaitingForGuessers {
-                                            teams: PerTeam::from_fn(|team| {
-                                                current_round[team].decipher.is_none()
-                                                    || (current_round[team].intercept.is_none()
-                                                        && !completed_rounds.is_empty())
-                                            }),
-                                            deadline: deadlines[team.other()].clone(),
-                                        }
-                                    }
-                                } else {
-                                    if !current_round[team].timed_out.encrypt.is_some()
-                                        && current_round[team].clues.is_none()
-                                        && is_encryptor
-                                    {
-                                        Inputs::Encrypt {
-                                            code: current_round[team].code.clone(),
-                                            deadline: deadlines[team].clone(),
-                                        }
-                                    } else {
-                                        Inputs::WaitingForEncryptors {
-                                            teams: current_round
-                                                .clone()
-                                                .map(|round| round.clues.is_none()),
-                                            deadline: deadlines[team.other()].clone(),
+                                        if !current_round[team].timed_out.encrypt.is_some()
+                                            && current_round[team].clues.is_none()
+                                            && is_encryptor
+                                        {
+                                            Inputs::Encrypt {
+                                                code: current_round[team].code.clone(),
+                                                deadline: deadlines[team].clone(),
+                                            }
+                                        } else {
+                                            Inputs::WaitingForEncryptors {
+                                                teams: current_round
+                                                    .clone()
+                                                    .map(|round| round.clues.is_none()),
+                                                deadline: deadlines[team.other()].clone(),
+                                            }
                                         }
                                     }
                                 }
-                            } else {
-                                Inputs::RoundNotActive
+                                GameInfoStateCurrentRound::Tiebreaker(round) => {
+                                    Inputs::Tiebreaker {
+                                        teams_done: round.as_ref().map(|t| t.guess.is_some()),
+                                        deadline: deadlines[team].clone(),
+                                    }
+                                }
                             },
                         }
                     } else {
                         GameStateView::InGameNotInTeam
                     }
                 }
+                GameInfoState::GameOver {
+                    keywords,
+                    completed_rounds,
+                    tiebreaker,
+                } => GameStateView::GameOver {
+                    keywords: keywords.clone(),
+                    completed_rounds: completed_rounds
+                        .iter()
+                        .map(|round| {
+                            let score = round.score();
+                            PerTeam::from_fn(|t| CompletedRoundPerTeam {
+                                non_computed: round[t].clone(),
+                                score: score[t],
+                            })
+                        })
+                        .collect(),
+                    tiebreaker: tiebreaker.clone(),
+                },
             };
 
             GameView {
@@ -580,9 +608,13 @@ impl State {
                 let game_info = self.games.get_mut(&game_id).expect("Should exist");
                 if let Some(team) = game_info.team_for_user(user_id) {
                     if let GameInfoState::InGame { current_round, .. } = &mut game_info.state {
-                        let Some(current_round) = current_round else {
-                            self.send_error(id, "No round in progress", ErrorSeverity::Info)
-                                .await;
+                        let GameInfoStateCurrentRound::Normal(current_round) = current_round else {
+                            self.send_error(
+                                id,
+                                "Cannot submit clues during tiebreaker",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
                             return Err(());
                         };
 
@@ -632,7 +664,7 @@ impl State {
                         self.broadcast_game_state(game_id).await;
                         Ok(())
                     } else {
-                        self.send_error(id, "Gaem not in progress", ErrorSeverity::Info)
+                        self.send_error(id, "Game not in progress", ErrorSeverity::Info)
                             .await;
                         Err(())
                     }
@@ -649,9 +681,13 @@ impl State {
                 let game_info = self.games.get_mut(&game_id).expect("Should exist");
                 if let Some(team) = game_info.team_for_user(user_id) {
                     if let GameInfoState::InGame { current_round, .. } = &mut game_info.state {
-                        let Some(current_round) = current_round else {
-                            self.send_error(id, "No round in progress", ErrorSeverity::Info)
-                                .await;
+                        let GameInfoStateCurrentRound::Normal(current_round) = current_round else {
+                            self.send_error(
+                                id,
+                                "Cannot decipher during tiebreaker",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
                             return Err(());
                         };
 
@@ -694,7 +730,7 @@ impl State {
                         self.broadcast_game_state(game_id).await;
                         Ok(())
                     } else {
-                        self.send_error(id, "Gaem not in progress", ErrorSeverity::Info)
+                        self.send_error(id, "Game not in progress", ErrorSeverity::Info)
                             .await;
                         Err(())
                     }
@@ -726,9 +762,13 @@ impl State {
                             return Err(());
                         }
 
-                        let Some(current_round) = current_round else {
-                            self.send_error(id, "No round in progress", ErrorSeverity::Info)
-                                .await;
+                        let GameInfoStateCurrentRound::Normal(current_round) = current_round else {
+                            self.send_error(
+                                id,
+                                "Cannot intercept during tiebreaker",
+                                ErrorSeverity::Info,
+                            )
+                            .await;
                             return Err(());
                         };
 
@@ -761,12 +801,57 @@ impl State {
                         self.broadcast_game_state(game_id).await;
                         Ok(())
                     } else {
-                        self.send_error(id, "Gaem not in progress", ErrorSeverity::Info)
+                        self.send_error(id, "Game not in progress", ErrorSeverity::Info)
                             .await;
                         Err(())
                     }
                 } else {
                     self.send_error(id, "You are not in a team", ErrorSeverity::Info)
+                        .await;
+                    Err(())
+                }
+            }
+            FromClient::SubmitTiebreaker(guess) => {
+                let user_id = self.require_auth(id).await?;
+                let game_id = self.require_game(id, user_id).await?;
+
+                let game_info = self.games.get_mut(&game_id).expect("Should exist");
+                let Some(team) = game_info.team_for_user(user_id) else {
+                    self.send_error(id, "You are not in a team", ErrorSeverity::Info)
+                        .await;
+                    return Err(());
+                };
+
+                if let GameInfoState::InGame { current_round, .. } = &mut game_info.state {
+                    let GameInfoStateCurrentRound::Tiebreaker(round) = current_round else {
+                        self.send_error(
+                            id,
+                            "Cannot submit tiebreaker outside of tiebreaker round",
+                            ErrorSeverity::Info,
+                        )
+                        .await;
+                        return Err(());
+                    };
+
+                    // Check for resubmission.
+                    if round[team].guess.is_some() {
+                        // Already submitted, cannot submit again.
+                        self.send_error(
+                            id,
+                            "Tiebreaker guess already submitted",
+                            ErrorSeverity::Info,
+                        )
+                        .await;
+                        return Err(());
+                    }
+
+                    // Success.
+                    round[team].guess = Some(guess);
+                    let _ = game_info.next_round_if_ready();
+                    self.broadcast_game_state(game_id).await;
+                    Ok(())
+                } else {
+                    self.send_error(id, "Game not in progress", ErrorSeverity::Info)
                         .await;
                     Err(())
                 }
@@ -786,27 +871,21 @@ impl State {
                         .await;
                     return Err(());
                 };
-                let Some(current_round) = current_round else {
-                    self.send_error(id, "No round in progress", ErrorSeverity::Info)
-                        .await;
-                    return Err(());
-                };
 
                 let now = Instant::now();
-
                 let mut any_changes = false;
+
                 for team in Team::ORDER {
                     if let Some(deadline) = &deadlines[team] {
                         if deadline.at < now {
                             // Deadline has expired, enforce it.
                             any_changes = true;
-                            current_round[team].timed_out.set_next(deadline.reason);
+                            current_round.timed_out_mut()[team].set_next(deadline.reason);
                             deadlines[team] = None;
                             continue;
                         }
                     }
                 }
-
                 if any_changes {
                     self.broadcast_game_state(game_id).await;
                 }
@@ -828,11 +907,6 @@ impl State {
                         .await;
                     return Err(());
                 };
-                let Some(current_round) = current_round else {
-                    self.send_error(id, "No round in progress", ErrorSeverity::Info)
-                        .await;
-                    return Err(());
-                };
 
                 // IF the current deadline has expired, enforce it.
                 // Otherwise, start the frustration timer.
@@ -843,7 +917,7 @@ impl State {
                     if let Some(deadline) = &deadlines[team] {
                         if deadline.at < now {
                             // Deadline has expired, enforce it.
-                            current_round[team].timed_out.set_next(deadline.reason);
+                            current_round.timed_out_mut()[team].set_next(deadline.reason);
                             deadlines[team] = None;
                             continue;
                         }

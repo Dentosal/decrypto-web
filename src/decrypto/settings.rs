@@ -9,7 +9,7 @@ use crate::decrypto::{Code, PerTeam, Team};
 #[serde(rename_all = "snake_case")]
 pub struct GameSettings {
     /// How soon start tiebreaker/draw procedure.
-    /// Default 8.
+    /// Default 8. Min 3.
     pub round_limit: Option<usize>,
     // How many keywords to show in the game.
     /// Default 4. Min 4.
@@ -21,14 +21,20 @@ pub struct GameSettings {
     pub clue_mode: ClueMode,
     /// Keyword list to use for the game.
     pub keyword_list: KeywordList,
-    /// Miscommunication limit before losing, default 2.
+    /// Miscommunication limit before losing.
+    /// Default 2. Min 1. Max `round_limit - 1`.
     pub miscommunication_limit: usize,
+    /// When to do tiebreaker round.
+    pub tiebreaker: Tiebreaker,
     /// Intercept limit before winning, default 2.
+    /// Default 2. Min 1. Max `round_limit - 2`.
     pub intercept_limit: usize,
     /// Timer for encryptors to encrypt clues.
     pub encrypt_time_limit: EncryptTimeLimit,
     /// Time to decide decipher and intercept attempts.
     pub guess_time_limit: GuessTimeLimit,
+    /// Time to do tiebreaker.
+    pub tiebreaker_time_limit: GuessTimeLimit,
 }
 impl Default for GameSettings {
     fn default() -> Self {
@@ -40,13 +46,38 @@ impl Default for GameSettings {
             keyword_list: Default::default(),
             miscommunication_limit: 2,
             intercept_limit: 2,
+            tiebreaker: Tiebreaker::default(),
             encrypt_time_limit: Default::default(),
             guess_time_limit: Default::default(),
+            tiebreaker_time_limit: Default::default(),
         }
     }
 }
 impl GameSettings {
     pub fn validate(&self) -> Result<(), String> {
+        if let Some(round_limit) = self.round_limit {
+            if round_limit < 3 {
+                return Err("Round limit must be at least 3".to_string());
+            }
+        }
+        if self.miscommunication_limit < 1 {
+            return Err("Miscommunication limit must be at least 1".to_string());
+        }
+        if self.intercept_limit < 1 {
+            return Err("Intercept limit must be at least 1".to_string());
+        }
+        if self.intercept_limit >= self.round_limit.unwrap_or(usize::MAX) - 1 {
+            return Err(format!(
+                "Intercept limit must be less than round limit minus 1, got {}",
+                self.intercept_limit
+            ));
+        }
+        if self.miscommunication_limit >= self.round_limit.unwrap_or(usize::MAX) - 1 {
+            return Err(format!(
+                "Miscommunication limit must be less than round limit minus 1, got {}",
+                self.miscommunication_limit
+            ));
+        }
         if self.keyword_count < 4 {
             return Err("Keyword count must be at least 4".to_string());
         }
@@ -143,6 +174,18 @@ impl KeywordList {
                 .collect(),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Tiebreaker {
+    /// Do tiebreaker round normally, i.e. when a draw would occur.
+    #[default]
+    OnDraw,
+    /// Never do tiebreaker round.
+    Never,
+    /// Always do tiebreaker round, even if other team wins, just for fun.
+    Always,
 }
 
 #[cfg(test)]
