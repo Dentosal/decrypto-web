@@ -267,14 +267,14 @@ impl GameInfo {
         }
 
         // Check if round limit is reached.
-        if let Some(round_limit) = self.settings.round_limit {
-            if completed_rounds.len() >= round_limit {
-                let keywords = keywords.clone();
-                let completed_rounds = completed_rounds.clone();
-                self._start_tiebreaker(keywords, completed_rounds);
-                return Some(score);
-            }
-        };
+        if let Some(round_limit) = self.settings.round_limit
+            && completed_rounds.len() >= round_limit
+        {
+            let keywords = keywords.clone();
+            let completed_rounds = completed_rounds.clone();
+            self._start_tiebreaker(keywords, completed_rounds);
+            return Some(score);
+        }
 
         // Otherwise, start a new round.
         *current_round = GameInfoStateCurrentRound::Normal(Round::from(Team::ORDER.map(|team| {

@@ -56,10 +56,10 @@ impl Default for GameSettings {
 }
 impl GameSettings {
     pub fn validate(&self) -> Result<(), String> {
-        if let Some(round_limit) = self.round_limit {
-            if round_limit < 3 {
-                return Err("Round limit must be at least 3".to_string());
-            }
+        if let Some(round_limit) = self.round_limit
+            && round_limit < 3
+        {
+            return Err("Round limit must be at least 3".to_string());
         }
         if self.miscommunication_limit < 1 {
             return Err("Miscommunication limit must be at least 1".to_string());

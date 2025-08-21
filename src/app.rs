@@ -949,21 +949,21 @@ impl State {
                 let mut any_changes = false;
 
                 for team in Team::ORDER {
-                    if let Some(deadline) = &deadlines[team] {
-                        if deadline.at < now {
-                            // Deadline has expired, enforce it.
-                            any_changes = true;
-                            match current_round {
-                                GameInfoStateCurrentRound::Normal(r) => {
-                                    r[team].timed_out.set_next(deadline.reason)
-                                }
-                                GameInfoStateCurrentRound::Tiebreaker(r) => {
-                                    r[team].timed_out = Some(deadline.reason)
-                                }
+                    if let Some(deadline) = &deadlines[team]
+                        && deadline.at < now
+                    {
+                        // Deadline has expired, enforce it.
+                        any_changes = true;
+                        match current_round {
+                            GameInfoStateCurrentRound::Normal(r) => {
+                                r[team].timed_out.set_next(deadline.reason)
                             }
-                            deadlines[team] = None;
-                            continue;
+                            GameInfoStateCurrentRound::Tiebreaker(r) => {
+                                r[team].timed_out = Some(deadline.reason)
+                            }
                         }
+                        deadlines[team] = None;
+                        continue;
                     }
                 }
                 if any_changes {
@@ -994,20 +994,20 @@ impl State {
                 let now = Instant::now();
 
                 for team in teams.teams() {
-                    if let Some(deadline) = &deadlines[team] {
-                        if deadline.at < now {
-                            // Deadline has expired, enforce it.
-                            match current_round {
-                                GameInfoStateCurrentRound::Normal(r) => {
-                                    r[team].timed_out.set_next(deadline.reason)
-                                }
-                                GameInfoStateCurrentRound::Tiebreaker(r) => {
-                                    r[team].timed_out = Some(deadline.reason)
-                                }
+                    if let Some(deadline) = &deadlines[team]
+                        && deadline.at < now
+                    {
+                        // Deadline has expired, enforce it.
+                        match current_round {
+                            GameInfoStateCurrentRound::Normal(r) => {
+                                r[team].timed_out.set_next(deadline.reason)
                             }
-                            deadlines[team] = None;
-                            continue;
+                            GameInfoStateCurrentRound::Tiebreaker(r) => {
+                                r[team].timed_out = Some(deadline.reason)
+                            }
                         }
+                        deadlines[team] = None;
+                        continue;
                     }
                     // Start the frustration timer.
                     deadlines[team] = Some(Deadline {
