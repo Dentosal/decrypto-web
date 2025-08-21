@@ -1,13 +1,9 @@
 # fmt
 [tasks.fmt]
-dependencies = ["cargo-fmt", "deno-fmt", "python-fmt"]
+dependencies = ["cargo-fmt", "python-fmt"]
 
 [tasks.cargo-fmt]
 command = "cargo"
-args = ["fmt"]
-
-[tasks.deno-fmt]
-command = "deno"
 args = ["fmt"]
 
 [tasks.python-fmt]
@@ -16,14 +12,10 @@ args = ["-m", "black", "."]
 
 # fmt-check
 [tasks.fmt-check]
-dependencies = ["cargo-fmt-check", "deno-fmt-check", "python-fmt-check"]
+dependencies = ["cargo-fmt-check", "python-fmt-check"]
 
 [tasks.cargo-fmt-check]
 command = "cargo"
-args = ["fmt", "--check"]
-
-[tasks.deno-fmt-check]
-command = "deno"
 args = ["fmt", "--check"]
 
 [tasks.python-fmt-check]
