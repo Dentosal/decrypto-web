@@ -93,9 +93,9 @@ def start_game_if_possible(driver):
         pass
 
 
-def do_input_actions(driver, index, strategy) -> Optional[str]:
+def extract_round_index(driver) -> Optional[int]:
     try:
-        round_index = (
+        return (
             int(
                 driver.find_element(
                     By.CSS_SELECTOR, ".history tr:last-child td:first-child"
@@ -105,6 +105,33 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
         )
     except NoSuchElementException:
         return None
+
+
+def do_input_tiebreaker(driver, root):
+    for inp in root.find_elements(By.CSS_SELECTOR, "tiebreaker-input"):
+        textbox = inp.shadow_root.find_element(By.CSS_SELECTOR, "input[type=text]")
+        if textbox.get_attribute("value") == "":
+            textbox.send_keys("I guess, nope")
+            textbox.send_keys(Keys.ENTER)
+            time.sleep(0.1)
+            break
+        elif textbox.get_attribute("value") == "I guess, nope":
+            pass
+        else:
+            textbox.clear()
+
+
+def do_input_actions(driver, index, strategy) -> Optional[str]:
+    round_index = extract_round_index(driver)
+    if round_index is None:
+        return None
+
+    try:
+        view = driver.find_element(By.CSS_SELECTOR, "tiebreaker-view")
+    except NoSuchElementException:
+        view = None
+    if view is not None:
+        do_input_tiebreaker(driver, view.shadow_root)
 
     try:
         for ia in driver.find_elements(By.CSS_SELECTOR, "div.input-action"):
@@ -173,14 +200,7 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
             elif "Waiting for" in h1:
                 pass
             elif "Tiebreaker" in h1:
-                for textbox in ia.find_elements(By.CSS_SELECTOR, "input[type=text]"):
-                    if textbox.get_attribute("value") == "":
-                        textbox.send_keys("I guess, nope")
-                        textbox.send_keys(Keys.ENTER)
-                        time.sleep(0.1)
-                        break
-                    else:
-                        textbox.clear()
+                pass
             elif "Game Over" in h1:
                 if "win" in h1 or "won" in h1:
                     return "win"

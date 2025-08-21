@@ -1,4 +1,4 @@
-import { html } from 'https://unpkg.com/lit?module';
+import { LitElement, html, css } from 'https://unpkg.com/lit?module';
 import semantic from './semantic.js';
 
 const renderKeywords = (state) => {
@@ -243,69 +243,171 @@ const renderIntercept = (state) => {
         `;
 };
 
-const renderTiebreaker = (state, deadline) => {
-    let myTeam = state.game.players.find((p) => p.id === state.user_info.id).team;
+const inputActionCSS = css`
+.input-action {
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+}
+.input-action h1 {
+    margin: 0;
+    font-size: 1.2em;
+}
+`;
 
-    let inputs = [];
-    for (let i = 0; i < state.game.settings.keyword_count; i += 1) {
-        let s = state.game.inputs.tiebreaker.submitted[+myTeam][i];
-        inputs.push(html`
-        <tr>
-            <td>${i + 1}.</td>
-            <td>${
-            s === null
-                ? html`<input
-                    type="text"
-                    placeholder="Guess keyword"
-                    .value=${state.tiebreaker_inputs[i] || ''}
-                    @input=${(e) => {
-                    state.tiebreaker_inputs[i] = e.target.value;
-                    state.update();
-                }}
-                    @keypress=${(e) => {
-                    if (e.key === 'Enter') {
-                        let guess = e.target.value.trim();
-                        if (guess.length > 0) {
-                            state.dispatchEvent(new CustomEvent('send-cmd', {
-                                detail: { submit_tiebreaker: { index: i, guess } },
-                                bubbles: true,
-                                composed: true,
-                            }));
-                        }
-                    }
-                }}
-                />`
-                : html`<span class="tiebreaker-guess">${s.guess}</span>`
-        }</td>
-            <td>${
-            s === null ? '' : html`<span class="tiebreaker-is-correct">${s.is_correct ? 'correct' : 'incorrect'}</span>`
-        }</td>
-            <td>${s === null ? '' : html`<span class="tiebreaker-correct-answer">${s.correct}</span>`}</td>
-        </tr>
-        `);
+class TiebreakerInput extends LitElement {
+    static properties = {
+        index: { type: Number },
+        value: { type: String },
+        submitted: { type: Object },
+    };
+
+    constructor() {
+        super();
+        this.value = '';
+        this.submitted = null;
     }
 
-    let waitText = 'Waiting for the other team to finish the tiebreaker...';
-    return html`
-        <div class="input-action">
-            <h1>Tiebreaker!</h1>
-            <p>Guess the keywords of the other team:</p>
-            <table class="tiebreaker-inputs">
-                <thead>
-                    <th>#</th>
-                    <th>Guess</th>
-                    <th>Result</th>
-                    <th>Actual</th>
-                </thead>
-                <tbody>${inputs}</tbody>
-            </table>
+    static styles = css`
+        .row {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+    `;
 
-            ${
-        state.game.inputs.tiebreaker.teams_done[+myTeam]
-            ? html`<div class="input-action"><h1>${waitText}</h1>${renderHurryUp(state, deadline)}</div>`
-            : ''
+    handleInput(e) {
+        this.value = e.target.value;
+        this.dispatchEvent(new CustomEvent('tiebreaker-input', {
+            detail: { index: this.index, value: this.value },
+            bubbles: true,
+            composed: true,
+        }));
     }
+
+    handleKeyPress(e) {
+        if (e.key === 'Enter') {
+            let guess = e.target.value.trim();
+            if (guess.length > 0) {
+                this.dispatchEvent(new CustomEvent('submit-tiebreaker', {
+                    detail: { index: this.index, guess },
+                    bubbles: true,
+                    composed: true,
+                }));
+            }
+        }
+    }
+
+    render() {
+        if (this.submitted) {
+            return html`
+            <div class="row">
+                <div>${this.index + 1}.</div>
+                <div class="tiebreaker-guess">${this.submitted.guess}</div>
+                <div class="tiebreaker-is-correct">${this.submitted.is_correct ? 'correct' : 'incorrect'}</div>
+                <div class="tiebreaker-correct-answer">${this.submitted.correct}</div>
+            </div>
+            `;
+        }
+        return html`
+        <div class="row">
+            <td>${this.index + 1}.</td>
+            <td><input
+                type="text"
+                placeholder="Guess keyword"
+                .value=${this.value}
+                @input=${this.handleInput}
+                @keypress=${this.handleKeyPress}
+            /></td>
+            <td></td>
+            <td></td>
         </div>
+        `;
+    }
+}
+
+customElements.define('tiebreaker-input', TiebreakerInput);
+
+class TiebreakerView extends LitElement {
+    static properties = {
+        state: { type: Object },
+        deadline: { type: Object },
+    };
+
+    static get styles() {
+        return [
+            inputActionCSS,
+            css`
+            .tiebreaker-inputs {
+                display: flex;
+                flex-direction: column;
+                flex-wrap: wrap;
+                gap: 1rem;
+            }
+            `
+        ];
+    }
+
+    handleInput(e) {
+        const { index, value } = e.detail;
+        this.state.tiebreaker_inputs[index] = value;
+        this.state.update();
+    }
+
+    handleSubmit(e) {
+        const { index, guess } = e.detail;
+        this.state.send({ submit_tiebreaker: { index, guess } });
+    }
+
+    renderInputs() {
+        const myTeam = this.state.game.players.find((p) => p.id === this.state.user_info.id).team;
+        const inputs = [];
+
+        for (let i = 0; i < this.state.game.settings.keyword_count; i++) {
+            const submitted = this.state.game.inputs.tiebreaker.submitted[+myTeam][i];
+            inputs.push(html`
+                <tiebreaker-input
+                    .index=${i}
+                    .value=${this.state.tiebreaker_inputs?.[i] || ''}
+                    .submitted=${submitted}
+                    @tiebreaker-input=${this.handleInput.bind(this)}
+                    @submit-tiebreaker=${this.handleSubmit.bind(this)}
+                ></tiebreaker-input>
+            `);
+        }
+
+        return inputs;
+    }
+
+    render() {
+        const myTeam = this.state.game.players.find((p) => p.id === this.state.user_info.id).team;
+        const waitText = 'Waiting for the other team to finish the tiebreaker...';
+
+        return html`
+            <div class="tiebreaker-container input-action">
+                <h1>Tiebreaker!</h1>
+                <p>Guess the keywords of the other team:</p>
+                <div class="tiebreaker-inputs">
+                    ${this.renderInputs()}
+                </div>
+                ${
+            this.state.game.inputs.tiebreaker.teams_done[+myTeam]
+                ? html`<div class="input-action"><h1>${waitText}</h1>${renderHurryUp(this.state, this.deadline)}</div>`
+                : ''
+        }
+            </div>
+        `;
+    }
+}
+
+customElements.define('tiebreaker-view', TiebreakerView);
+
+const renderTiebreaker = (state, deadline) => {
+    return html`
+        <tiebreaker-view
+            .state=${state}
+            .deadline=${deadline}
+        ></tiebreaker-view>
     `;
 };
 
