@@ -1,5 +1,6 @@
 import { html } from 'https://unpkg.com/lit?module';
 import semantic from './semantic.js';
+import './paint.js';
 
 const renderKeywords = (state) => {
     return html`
@@ -17,45 +18,58 @@ const renderKeywords = (state) => {
 
 const renderClueInput = (state, keywordIndex, clueIndex) => {
     let input = [];
-    if (state.game.settings.clue_mode !== 'draw') {
-        input.push(html`
-        <input
-            type="text"
-            placeholder="Clue"
-            .value=${state.clue_inputs[clueIndex]?.text || ''}
-            @input=${(e) => {
-            state.clue_inputs[clueIndex] = { text: e.target.value };
-            state.update();
-        }}
-        />
+
+    if (state.clue_inputs[clueIndex]?.drawing) {
+        input.push( html`
+            ${semantic.clueDrawing(state, state.clue_inputs[clueIndex]?.drawing)}
+            <input
+                type="button"
+                value="Remove drawing"
+                @click=${() => {
+                    delete state.clue_inputs[clueIndex]; // Remove the drawing clue
+                    state.update();
+                }}
+            />
         `);
-    }
-    if (state.game.settings.clue_mode !== 'text') {
-        input.push(html`
-        <input
-            type="button"
-            value="Draw it! (TODO)"
-            disabled
-        />
-        `);
+    } else {
+        if (state.game.settings.clue_mode !== 'draw') {
+            input.push(html`
+            <input
+                type="text"
+                placeholder="Clue"
+                .value=${state.clue_inputs[clueIndex]?.text || ''}
+                @input=${(e) => {
+                state.clue_inputs[clueIndex] = { text: e.target.value };
+                state.update();
+            }}
+            />
+            `);
+        }
+        if (state.game.settings.clue_mode !== 'text') {
+            input.push(html`
+            <input
+                type="button"
+                value=${ state.game.settings.clue_mode === 'either' ? "Draw it instead!?" : "Draw"}
+                @click=${() => {
+                    delete state.clue_inputs[clueIndex]; // Remove any existing text clue
+                    state.clue_input_draw = {
+                        clueIndex,
+                        title: '' + (keywordIndex + 1) + '. ' + state.game.keywords[clueIndex],
+                    };
+                    state.update();
+                }}
+            />
+            `);
+        }
     }
 
     return html`
     <tr>
         <td>${keywordIndex + 1}.</td>
         <td>${state.game.keywords[clueIndex]}</td>
-        <td>${input}</td>
+        <td class="row">${input}</td>
     </tr>
     `;
-};
-
-const renderClue = (state, clue) => {
-    if ('text' in clue) {
-        return html`<span class="clue clue-text">${clue.text}</span>`;
-    } else {
-        console.warn(`Clue not supported:`, clue);
-        return html`<span class="clue">[Unsupported clue type]</span>`;
-    }
 };
 
 const submitClues = (state) => {
@@ -63,9 +77,10 @@ const submitClues = (state) => {
     for (let i = 0; i < state.clue_inputs.length; i += 1) {
         if (state.clue_inputs[i]?.text) {
             data.push({ text: state.clue_inputs[i].text });
+        } else if (state.clue_inputs[i]?.drawing) {
+            data.push({ drawing: state.clue_inputs[i].drawing });
         } else {
-            // TODO: handle image clues, upload separately?
-            console.warn(`Clue input ${i} is empty, skipping`);
+            console.error(`Clue input ${i} is empty, skipping`);
         }
     }
     state.send({ submit_clues: data });
@@ -154,7 +169,7 @@ const renderDecipher = (state) => {
             ${
         state.game.current_round[+myTeam].clues === null
             ? html`<li>Encryptor ran out of time, no clues for you.</li>`
-            : state.game.current_round[+myTeam].clues.map((clue) => html`<li>${renderClue(state, clue)}</li>`)
+            : state.game.current_round[+myTeam].clues.map((clue) => html`<li>${semantic.clue(state, clue)}</li>`)
     }
         </ul>
         <input
@@ -195,7 +210,7 @@ const renderIntercept = (state) => {
             ${
         state.game.current_round[+!myTeam].clues === null
             ? html`<li>Encryptor ran out of time, nothing to intercept.</li>`
-            : state.game.current_round[+!myTeam].clues.map((clue) => html`<li>${renderClue(state, clue)}</li>`)
+            : state.game.current_round[+!myTeam].clues.map((clue) => html`<li>${semantic.clue(state, clue)}</li>`)
     }
             <input
                 type="text"
@@ -279,11 +294,17 @@ const renderTiebreaker = (state, deadline) => {
 const renderAction = (state) => {
     let myTeam = state.game.players.find((p) => p.id === state.user_info.id).team;
 
+    // do state resets if needed
+    if (!('encrypt' in state.game.inputs)) {
+        state.clue_inputs = [];
+        state.clue_input_draw = null;
+    }
+
     if ('encrypt' in state.game.inputs) {
         let code = state.game.inputs.encrypt.code;
         let deadline = state.game.inputs.encrypt.deadline;
         let disabled = Object.keys(state.clue_inputs).length !== code.length ||
-            state.clue_inputs.some((c) => !c.text);
+            state.clue_inputs.some((c) => !c?.text && !c?.drawing);
         return html`
         <div class="input-action">
             <h1>It's your turn to give clues!</h1>
@@ -303,6 +324,18 @@ const renderAction = (state) => {
                 @click=${() => submitClues(state)}
             />
             ${renderDeadline(state, deadline)}
+            ${state.clue_input_draw !== null
+                ? html`<paint-overlay
+                    .state=${ state }
+                    .gameId=${ state.game.id }
+                    .clueArray=${ state.clue_inputs }
+                    .clueIndex=${ state.clue_input_draw.clueIndex }
+                ><div>
+                    <h2>${state.clue_input_draw.title}</h2>
+                    ${renderDeadline(state, deadline)}
+                </div></paint-overlay> `
+                : null
+            }            
         </div>
         `;
     } else if ('guess' in state.game.inputs) {
@@ -374,10 +407,9 @@ const renderInterceptionMatrix = (state, team) => {
             ${
         state.game.completed_rounds.map((round, index) =>
             html`
-                <tr>
-                    <td>${semantic.round(state, index)}</td>
-                    ${
-                Array(state.game.settings.keyword_count).keys().map((i) => {
+            <tr>
+                <td>${semantic.round(state, index)}</td>
+                ${Array(state.game.settings.keyword_count).keys().map((i) => {
                     if (!round[+team].clues) {
                         return html`<td>?</td>`;
                     }
@@ -389,11 +421,9 @@ const renderInterceptionMatrix = (state, team) => {
                         return html`<td></td>`;
                     }
                     let clue = round[+team].clues[lookup];
-                    return html`<td>${renderClue(state, clue)}</td>`;
-                })
-            }
-                </tr>
-            `
+                    return html`<td>${semantic.clue(state, clue)}</td>`;
+                })}
+            </tr>`
         )
     }
         </tbody>
@@ -440,11 +470,10 @@ const renderRoundHistory = (state) => {
                     <td>${semantic.player(state, round[+myTeam].encryptor)}</td>
                     <td>${semantic.code(state, round[+myTeam].code, myTeam)}</td>
                     <td><div class="clues column">
-                        ${
-                round[+myTeam].clues !== null
-                    ? round[+myTeam].clues.map((clue) => renderClue(state, clue))
-                    : html`Timed out`
-            }
+                        ${round[+myTeam].clues !== null
+                            ? round[+myTeam].clues.map((clue) => semantic.clue(state, clue))
+                            : html`Timed out`
+                        }
                     </div></td>
                     <td>
                         ${semantic.code(state, round[+myTeam].decipher, myTeam)}
@@ -459,11 +488,10 @@ const renderRoundHistory = (state) => {
                     <td>${semantic.player(state, round[+!myTeam].encryptor)}</td>
                     <td>${semantic.code(state, round[+!myTeam].code, !myTeam)}</td>
                     <td><div class="clues column">
-                        ${
-                round[+!myTeam].clues !== null
-                    ? round[+!myTeam].clues.map((clue) => renderClue(state, clue))
-                    : html`Timed out`
-            }
+                        ${round[+!myTeam].clues !== null
+                            ? round[+!myTeam].clues.map((clue) => semantic.clue(state, clue))
+                            : html`Timed out`
+                        }
                     </div></td>
                     <td>
                         ${semantic.code(state, round[+!myTeam].decipher, !myTeam)}
@@ -479,29 +507,28 @@ const renderRoundHistory = (state) => {
             `
         )
     }
-            ${
-        state.game.current_round
-            ? html`
+            ${ state.game.current_round
+                ? html`
                 <tr>
                     <td>${semantic.round(state, state.game.completed_rounds.length)}</td>
                     <td>${semantic.player(state, state.game.current_round[+myTeam].encryptor)}</td>
                     <td>?</td>
                     <td><div class="clues column">
-                        ${state.game.current_round[+myTeam].clues?.map((clue) => renderClue(state, clue))}
+                        ${state.game.current_round[+myTeam].clues?.map((clue) => semantic.clue(state, clue))}
                     </div></td>
                     <td></td>
                     <td></td>
                     <td>${semantic.player(state, state.game.current_round[+!myTeam].encryptor)}</td>
                     <td>?</td>
                     <td><div class="clues column">
-                        ${state.game.current_round[+!myTeam].clues?.map((clue) => renderClue(state, clue))}
+                        ${state.game.current_round[+!myTeam].clues?.map((clue) => semantic.clue(state, clue))}
                     </div></td>
                     <td></td>
                     <td></td>
                 </tr>
                 `
-            : ''
-    }
+                : ''
+            }
         </tbody>
     </table>
     </div>
@@ -519,23 +546,15 @@ export default function viewInGame(state) {
                 <h1>Game Over: ${winner === null ? 'draw' : (winner === myTeam ? 'you won!' : 'you lost!')}</h1>
                 <h2>Keywords for your team were:</h2>
                 <div class="row keywords">
-                ${
-            state.game.keywords[+myTeam].map((keyword, index) =>
-                html`
-                    <div>${index + 1}. <span class="keyword">${keyword}</span></div>
-                `
-            )
-        }
+                ${state.game.keywords[+myTeam].map((keyword, index) =>
+                    html`<div>${index + 1}. <span class="keyword">${keyword}</span></div>`
+                )}
                 </div>
                 <h2>Keywords for the other team were:</h2>
                 <div class="row keywords">
-                ${
-            state.game.keywords[+!myTeam].map((keyword, index) =>
-                html`
-                    <div>${index + 1}. <span class="keyword">${keyword}</span></div>
-                `
-            )
-        }
+                    ${state.game.keywords[+!myTeam].map((keyword, index) =>
+                        html`<div>${index + 1}. <span class="keyword">${keyword}</span></div>`
+                    )}
                 </div>
             </div>
             <div class="spacer"></div>

@@ -68,9 +68,9 @@ const renderChatMessage = (state, msg) => {
         if (m) {
             return semantic.clueText(state, m[1]);
         }
-        m = tag.match(/^clue:image:(.+)$/);
+        m = tag.match(/^clue:drawing:(.+)$/);
         if (m) {
-            return semantic.clueImage(state, m[1]);
+            return semantic.clueDrawing(state, m[1]);
         }
         if (tag == 'br' || tag == '\n') {
             return html`<br>`;

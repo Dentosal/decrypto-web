@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     decrypto::settings::GameSettings,
-    id::UserId,
+    id::{DrawingId, UserId},
     message::{ChatMessage, Clue, CurrentRoundPerTeam, Deadline, DeadlineReason},
 };
 
@@ -87,6 +87,9 @@ pub struct GameInfo {
     pub global_chat: Vec<ChatMessage>,
     ///  All players that have ever been in this game.
     players: HashMap<UserId, GamePlayerInfo>,
+    /// Drawings in this game lobby, in png format.
+    pub drawings: HashMap<DrawingId, Vec<u8>>,
+    /// State of the game.
     pub state: GameInfoState,
 }
 

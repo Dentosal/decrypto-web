@@ -5,20 +5,26 @@
 
 use axum::{
     Router,
+    body::Bytes,
     extract::{
-        State,
+        Path, State,
         ws::{WebSocket, WebSocketUpgrade},
     },
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{any, get},
+    routing::{any, get, post},
 };
 use futures::stream::StreamExt;
 use std::{env, fs, sync::Arc};
 use tokio::sync::Mutex;
 use tower_http::services::ServeDir;
+use uuid::Uuid;
 
-use crate::{decrypto::settings::available_wordlists, id::ConnectionId, message::FromClient};
+use crate::{
+    decrypto::settings::available_wordlists,
+    id::{ConnectionId, DrawingId, GameId},
+    message::FromClient,
+};
 
 mod app;
 mod decrypto;
@@ -32,9 +38,12 @@ async fn main() {
     let static_files = ServeDir::new("./static");
     let app = Router::new()
         .route("/ws", any(ws))
-        .with_state(shared_state)
+        .with_state(shared_state.clone())
         .route("/version", get(get_version))
         .route("/wordlists", get(get_wordlists))
+        .route("/drawing/{game_id}/{drawing_id}", get(get_drawing))
+        .route("/drawing/{game_id}", post(post_drawing))
+        .with_state(shared_state)
         .fallback_service(static_files);
     let addr = std::env::args().nth(1).unwrap_or("0.0.0.0:3000".to_owned());
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
@@ -66,6 +75,50 @@ pub async fn get_wordlists() -> Response {
     }
 
     axum::Json(serde_json::json!(wordlists)).into_response()
+}
+
+async fn get_drawing(
+    Path((game_id, drawing_id)): Path<(GameId, DrawingId)>,
+    State(state): State<Arc<Mutex<app::State>>>,
+) -> Response {
+    let state = state.lock().await;
+    let Some(game) = state.games.get(&game_id) else {
+        log::warn!("Game {game_id:?} not found");
+        return (StatusCode::NOT_FOUND, "Game not found").into_response();
+    };
+
+    let Some(drawing) = game.drawings.get(&drawing_id) else {
+        log::warn!("Drawing {drawing_id:?} not found in game {game_id:?}");
+        return (StatusCode::NOT_FOUND, "Drawing not found").into_response();
+    };
+
+    axum::response::Response::builder()
+        .header("Content-Type", "image/png")
+        .body(axum::body::Body::from(drawing.clone()))
+        .unwrap()
+        .into_response()
+}
+
+async fn post_drawing(
+    Path(game_id): Path<GameId>,
+    State(state): State<Arc<Mutex<app::State>>>,
+    body: Bytes,
+) -> Response {
+    let mut state = state.lock().await;
+    let Some(game) = state.games.get_mut(&game_id) else {
+        log::warn!("Game {game_id:?} not found");
+        return (StatusCode::NOT_FOUND, "Game not found").into_response();
+    };
+
+    if body.len() > 1024 * 1024 {
+        log::warn!("Drawing too large");
+        return (StatusCode::PAYLOAD_TOO_LARGE, "Drawing too large").into_response();
+    }
+
+    let id = DrawingId::new();
+    game.drawings.insert(id, body.to_vec());
+
+    (StatusCode::OK, id.0.to_string()).into_response()
 }
 
 async fn ws(ws: WebSocketUpgrade, State(state): State<Arc<Mutex<app::State>>>) -> Response {

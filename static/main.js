@@ -13,6 +13,7 @@ const state = {
     decipher_input: '',
     intercept_input: '',
     global_chat_input: '',
+    clue_input_draw: null,
     clue_inputs: [],
     tiebreaker_inputs: [],
     override_view: null,

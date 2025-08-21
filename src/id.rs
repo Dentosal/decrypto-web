@@ -51,3 +51,12 @@ impl fmt::Display for GameId {
         write!(f, "#{}", self.0)
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct DrawingId(pub Uuid);
+
+impl DrawingId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+}

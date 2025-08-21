@@ -169,14 +169,14 @@ pub enum ErrorSeverity {
 #[serde(rename_all = "snake_case")]
 pub enum Clue {
     Text(String),
-    Image(Uuid),
+    Drawing(Uuid),
 }
 
 impl fmt::Display for Clue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Clue::Text(text) => write!(f, "<clue:text:{text}>"),
-            Clue::Image(id) => write!(f, "<clue:image:{id}>"),
+            Clue::Drawing(id) => write!(f, "<clue:drawing:{id}>"),
         }
     }
 }

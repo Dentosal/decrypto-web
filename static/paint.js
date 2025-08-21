@@ -1,18 +1,22 @@
-import { css, html, LitElement } from 'https://unpkg.com/lit?module';
+import { html, css, LitElement } from 'https://unpkg.com/lit?module';
 
 const width = 800;
 const height = 600;
 
-const saveDrawing = async (canvas, gameId) => {
-    canvas.toBlob((img) => {
+const saveDrawing = async (canvas, state, gameId, clueArray, clueIndex) => {
+    canvas.toBlob(async (img) => {
         if (img) {
-            fetch('/drawing/' + gameId, {
+            let r = await fetch('/drawing/' + gameId, {
                 method: 'POST',
                 body: img,
                 headers: {
                     'Content-Type': 'image/png',
                 },
             });
+            let draingId = await r.text();
+            clueArray[clueIndex] = { drawing: draingId };
+            state.clue_input_draw = null; // Close the paint overlay
+            state.update();
         } else {
             console.error('Failed to create image blob');
         }
@@ -41,7 +45,7 @@ const floodFill = (ctx, startX, startY, fillColor, tolerance = 50, expand = 1) =
     const fillB = parseInt(fillColor.slice(5, 7), 16);
 
     // Masks
-    const mask = new Uint8Array(width * height); // inside tolerance
+    const mask = new Uint8Array(width * height);     // inside tolerance
     const expanded = new Uint8Array(width * height); // expanded edge
 
     const colorDiff = (i) =>
@@ -112,7 +116,10 @@ const floodFill = (ctx, startX, startY, fillColor, tolerance = 50, expand = 1) =
 
 class PaintOverlay extends LitElement {
     static properties = {
+        state: { type: Object },
         gameId: { type: String },
+        clueArray: { type: Array },
+        clueIndex: { type: Number },
         tool: { type: String },
         brushSize: { type: Number },
         currentColor: { type: String },
@@ -125,14 +132,8 @@ class PaintOverlay extends LitElement {
         this.currentColor = '#000000';
         this.colorHistory = [
             '#ffffff',
-            '#000000',
-            '#ff0000',
-            '#00ff00',
-            '#0000ff',
-            '#ffff00',
-            '#ff00ff',
-            '#00ffff',
-            '#808080',
+            '#000000', '#ff0000', '#00ff00', '#0000ff',
+            '#ffff00', '#ff00ff', '#00ffff', '#808080',
             '#800000',
         ];
         this.drawHistory = [];
@@ -224,81 +225,79 @@ class PaintOverlay extends LitElement {
         return html`
         <div class="paint-overlay row">
             <div class="toolbox column">
+                <slot></slot>
                 <div class="row">
                     <input type="color" class="color-current"
                         .value="${this.currentColor}"
-                        @input=${(e) => {
-            this.currentColor = e.target.value;
-        }}
+                        @input=${e => {
+                            this.currentColor = e.target.value;
+                        }}
                     />
                     <div class="color-history">
-                        ${
-            this.colorHistory.map((color, i) =>
-                html`<div class="color-box"
+                        ${this.colorHistory.map((color, i) => html`<div class="color-box"
                             x-value="${color}"
                             style="background-color: ${color};"
-                            @click=${(e) => {
-                    this.currentColor = e.target.getAttribute('x-value');
-                    this.colorHistory.unshift(this.colorHistory.splice(i, 1)[0]);
-                    e.preventDefault();
-                    return false;
-                }}/>`
-            )
-        }
+                            @click=${e => {
+                                this.currentColor = e.target.getAttribute('x-value');
+                                this.colorHistory.unshift(this.colorHistory.splice(i, 1)[0]);
+                                e.preventDefault();
+                                return false;
+                            }}/>`
+                        )}
                     </div>
                 </div>
                 <input type="range" class="brush-size" min="1" max="100"
-                    .value="${this.brushSize}" @input=${(e) => this.brushSize = e.target.value}/>
+                    .value="${this.brushSize}" @input=${e => this.brushSize = e.target.value}/>
                 <div class="row wrap">
                     <input type="button" class="tool pen" value="Pen"
                         x-active=${this.tool === 'pen'}
-                        @click=${(e) => this.tool = 'pen'}
+                        @click=${e => this.tool = 'pen'}
                     />
                     <input type="button" class="tool eraser" value="Eraser"
                         x-active=${this.tool === 'eraser'}
-                        @click=${(e) => this.tool = 'eraser'}
+                        @click=${e => this.tool = 'eraser'}
                     />
                 </div>
                 <div class="row wrap">
                     <input type="button" class="tool straight-line" value="Line"
                         x-active=${this.tool === 'line'}
-                        @click=${(e) => this.tool = 'line'}
+                        @click=${e => this.tool = 'line'}
                     />
                     <input type="button" class="tool fill" value="Bucket"
                         x-active=${this.tool === 'bucket'}
-                        @click=${(e) => this.tool = 'bucket'}
+                        @click=${e => this.tool = 'bucket'}
                     />
                 </div>
                 <div class="row wrap">
                     <input type="button" class="tool undo" value="Undo" ?disabled=${this.drawHistory.length === 0}
-                        @click=${(e) => {
-            this.redoStack.push(this.drawHistory.pop());
-            this.resetCanvasSnapshot();
-            this.redraw();
-            this.requestUpdate();
-        }}
+                        @click=${e => {
+                            this.redoStack.push(this.drawHistory.pop());
+                            this.resetCanvasSnapshot();
+                            this.redraw();
+                            this.requestUpdate();
+                        }}
                     />
                     <input type="button" class="tool redo" value="Redo" ?disabled=${this.redoStack.length === 0}
-                        @click=${(e) => {
-            this.drawHistory.push(this.redoStack.pop());
-            this.redraw();
-            this.requestUpdate();
-        }}
+                        @click=${e => {
+                            this.drawHistory.push(this.redoStack.pop());
+                            this.redraw();
+                            this.requestUpdate();
+                        }}
                     />
                 </div>
                 <div class="row wrap">
                     <input type="button" class="tool clear" value="Clear"
-                        @click=${(e) => {
-            this.drawHistory = [];
-            this.redoStack = [];
-            this.redraw();
-            this.requestUpdate();
-        }}
+                        @click=${e => {
+                            this.drawHistory = [];
+                            this.redoStack = [];
+                            this.redraw();
+                            this.requestUpdate();
+                        }}
                     />
                     <input type="button" class="tool save" value="Save"
-                        @click=${(e) => {
-            saveDrawing(this.canvas, this.gameId);
-        }}
+                        @click=${e => {
+                            saveDrawing(this.canvas, this.state, this.gameId, this.clueArray, this.clueIndex);
+                        }}
                     />
                 </div>
             </div>
@@ -329,6 +328,7 @@ class PaintOverlay extends LitElement {
 
         return { x, y };
     }
+
 
     firstUpdated() {
         this.canvas = this.renderRoot.querySelector('canvas');
@@ -382,7 +382,7 @@ class PaintOverlay extends LitElement {
     }
 
     colorUsed() {
-        let i = this.colorHistory.indexOf(this.currentColor);
+        let i = this.colorHistory.indexOf(this.currentColor)
         if (i === -1) {
             this.colorHistory.unshift(this.currentColor);
             this.colorHistory = this.colorHistory.slice(0, 10);
@@ -471,7 +471,3 @@ class PaintOverlay extends LitElement {
 }
 
 customElements.define('paint-overlay', PaintOverlay);
-
-export default function paint(gameId) {
-    return html`<paint-overlay .gameId=${gameId}></paint-overlay>`;
-}

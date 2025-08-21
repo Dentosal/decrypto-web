@@ -131,7 +131,7 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
             elif "decipher your clues" in h1:
                 correct = "-".join(
                     ct.get_attribute("innerText").split("=")[1]
-                    for ct in ia.find_elements(By.CSS_SELECTOR, ".clue-text")
+                    for ct in ia.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
                 )
                 use_correct = strategy(
                     StrategyInput(
@@ -151,7 +151,7 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
             elif "Attempt interception" in h1:
                 correct = "-".join(
                     ct.get_attribute("innerText").split("=")[1]
-                    for ct in ia.find_elements(By.CSS_SELECTOR, ".clue-text")
+                    for ct in ia.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
                 )
                 use_correct = strategy(
                     StrategyInput(

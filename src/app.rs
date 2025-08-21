@@ -22,7 +22,7 @@ use crate::{
 pub struct State {
     clients: HashMap<ConnectionId, ClientData>,
     users: HashMap<UserId, UserData>,
-    games: HashMap<GameId, GameInfo>,
+    pub games: HashMap<GameId, GameInfo>,
 }
 
 pub struct ClientData {

@@ -2,6 +2,7 @@ import subprocess
 import tempfile
 import time
 import platform
+from os import environ
 
 import portpicker
 import pytest
@@ -31,12 +32,12 @@ class GameServer:
         self.process.wait()
 
 
-def new_isolated_firefox(headless: bool = True):
+def new_isolated_firefox():
     """Create a fresh Firefox session with its own profile (isolated localStorage)."""
     profile_dir = tempfile.mkdtemp()
     options = Options()
     options.set_preference("profile", profile_dir)
-    if headless:
+    if environ.get("SHOW_BROWSER") not in ["1", "true", "yes"]:
         options.add_argument("--headless")
     # check if macOS
     if platform.system() == "Darwin":

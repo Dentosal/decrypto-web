@@ -16,6 +16,28 @@ const endHighlight = (e) => {
     });
 };
 
+var imageViewHoverTimer = null;
+const startImageView = (e) => {
+    imageViewHoverTimer = setTimeout(function () {
+        let container = document.createElement('div');
+        container.id = 'image-viewer-overlay';
+        container.style = 'pointer-events: none;';
+        let img = document.createElement('img');
+        img.src = e.target.src;
+        img.style = 'pointer-events: none;';
+        container.appendChild(img);
+        document.body.appendChild(container);
+    }, 250);
+};
+
+const endImageView = (e) => {
+    clearTimeout(imageViewHoverTimer);
+    let container = document.getElementById('image-viewer-overlay');
+    if (container) {
+        container.remove();
+    }
+};
+
 const player = (state, playerId) => {
     let player = state.game.players.find((p) => p.id === playerId);
     return html`<span
@@ -80,16 +102,26 @@ const clueText = (state, text) => {
     >${text}</span>`;
 };
 
-const clueImage = (state, imageId) => {
+const clueDrawing = (state, draingID) => {
     return html`<img
-        class="semantic-clue-image"
-        x-clue-image="${imageId}"
-        x-hl="clue-image:${imageId}"
-        @mouseenter=${startHighlight}
-        @mouseleave=${endHighlight}
-        src="/clueimage/${imageId}"
+        class="semantic-clue-drawing"
+        x-clue-drawing="${draingID}"
+        @mouseenter=${startImageView}
+        @mouseleave=${endImageView}
+        src="/drawing/${state.game.id}/${draingID}"
     >`;
 };
+
+const clue = (state, clue) => {
+    if (clue.text) {
+        return clueText(state, clue.text);
+    } else if (clue.drawing) {
+        return clueDrawing(state, clue.drawing);
+    } else {
+        return html`<span>[Unknown clue type]</span>`;
+    }
+}
+
 
 export default {
     player,
@@ -97,6 +129,7 @@ export default {
     code,
     round,
     result,
+    clue,
     clueText,
-    clueImage,
+    clueDrawing,
 };
