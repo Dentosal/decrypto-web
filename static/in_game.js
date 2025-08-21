@@ -1,4 +1,4 @@
-import { html } from 'https://unpkg.com/lit-html?module';
+import { html } from 'https://unpkg.com/lit?module';
 import semantic from './semantic.js';
 
 const renderKeywords = (state) => {

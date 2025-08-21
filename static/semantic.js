@@ -1,6 +1,6 @@
 // Semantic UI components
 
-import { html } from 'https://unpkg.com/lit-html?module';
+import { html } from 'https://unpkg.com/lit?module';
 
 const startHighlight = (e) => {
     let playerId = e.target.getAttribute('x-hl');

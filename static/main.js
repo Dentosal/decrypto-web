@@ -1,4 +1,4 @@
-import { html, render } from 'https://unpkg.com/lit-html?module';
+import { html, render } from 'https://unpkg.com/lit?module';
 import viewLobby from './lobby.js';
 import viewInGame from './in_game.js';
 import topbar from './topbar.js';
