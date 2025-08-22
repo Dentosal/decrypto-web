@@ -9,7 +9,9 @@ const kickButton = (state, playerId) => {
                 bubbles: true,
                 composed: true,
             }));
-        }}>Kick</button>
+        }}>
+            Kick
+        </button>
     `;
 };
 
