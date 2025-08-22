@@ -11,12 +11,8 @@ class AppRoot extends LitElement {
         ws: { type: Object },
         user_info: { type: Object },
         game: { type: Object },
-        decipher_input: { type: String },
-        intercept_input: { type: String },
         global_chat_input: { type: String },
         clue_input_draw: { type: Object },
-        clue_inputs: { type: Array },
-        tiebreaker_inputs: { type: Array },
         override_view: { type: String },
         version: { type: Object },
         wordlists: { type: Array },
@@ -24,19 +20,14 @@ class AppRoot extends LitElement {
         error_expires: { type: Number },
     };
 
-
     constructor() {
         super();
 
         this.ws = null;
         this.user_info = null;
         this.game = null;
-        this.decipher_input = '';
-        this.intercept_input = '';
         this.global_chat_input = '';
         this.clue_input_draw = null;
-        this.clue_inputs = [];
-        this.tiebreaker_inputs = [];
         this.override_view = null;
         this.version = null;
         this.wordlists = [];
