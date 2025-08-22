@@ -107,6 +107,24 @@ def extract_round_index(driver) -> Optional[int]:
         return None
 
 
+def do_input_clue_giver(root):
+    time.sleep(0.3)
+    for row in root.find_elements(By.CSS_SELECTOR, "tr"):
+        clue_for = row.find_element(By.CSS_SELECTOR, "td:nth-child(1)").get_attribute(
+            "innerText"
+        )
+        clue_input = row.find_element(
+            By.CSS_SELECTOR, "td:nth-child(3) input[type=text]"
+        )
+        if clue_input.get_attribute("value") == "":
+            clue_input.send_keys("kw=" + clue_for[:-1])
+    time.sleep(0.5)
+    submit = root.find_element(By.CSS_SELECTOR, "#submit-clues")
+    if not submit.get_attribute("disabled"):
+        submit.click()
+    time.sleep(0.1)
+
+
 def do_input_decipher(root, index, round_index, strategy):
     correct = "-".join(
         ct.get_attribute("innerText").split("=")[1]
@@ -180,6 +198,13 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
 
     try:
         try:
+            view = driver.find_element(By.CSS_SELECTOR, "clue-giver-view")
+        except NoSuchElementException:
+            view = None
+        if view is not None:
+            do_input_clue_giver(view.shadow_root)
+
+        try:
             view = driver.find_element(By.CSS_SELECTOR, "decipher-view")
         except NoSuchElementException:
             view = None
@@ -204,28 +229,12 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
 
     try:
         for ia in driver.find_elements(By.CSS_SELECTOR, "div.input-action"):
-
             try:
                 h1 = ia.find_element(By.CSS_SELECTOR, "h1").get_attribute("innerText")
             except NoSuchElementException:
                 continue
             if "It's your turn to give clues!" in h1:
-                # Give clues
-                time.sleep(0.3)
-                for row in ia.find_elements(By.CSS_SELECTOR, "tr"):
-                    clue_for = row.find_element(
-                        By.CSS_SELECTOR, "td:nth-child(1)"
-                    ).get_attribute("innerText")
-                    clue_input = row.find_element(
-                        By.CSS_SELECTOR, "td:nth-child(3) input[type=text]"
-                    )
-                    if clue_input.get_attribute("value") == "":
-                        clue_input.send_keys("kw=" + clue_for[:-1])
-                time.sleep(0.5)
-                submit = ia.find_element(By.CSS_SELECTOR, "#submit-clues")
-                if not submit.get_attribute("disabled"):
-                    submit.click()
-                time.sleep(0.1)
+                pass
             elif "decipher your clues" in h1:
                 pass
             elif "Attempt interception" in h1:

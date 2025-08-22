@@ -304,6 +304,154 @@ const renderIntercept = (state) => {
     return html`<intercept-view .state=${state}></intercept-view>`;
 };
 
+class ClueGiverView extends LitElement {
+    static properties = {
+        state: { type: Object },
+        clues: { type: Array },
+    };
+
+    constructor() {
+        super();
+        this.clues = [];
+    }
+
+    static get styles() {
+        return [
+            inputActionCSS,
+            css`
+            .clue-inputs {
+                width: 100%;
+            }
+            `
+        ];
+    }
+
+    connectedCallback() {
+        super.connectedCallback();
+        const codeLength = this.state.game.inputs.encrypt.code.length;
+        this.clues = Array(codeLength).fill(null);
+    }
+
+    updateClue(index, clue) {
+        this.clues[index] = clue;
+        this.requestUpdate();
+    }
+
+    submitClues() {
+        let data = [];
+        for (let i = 0; i < this.clues.length; i += 1) {
+            if (this.clues[i]?.text) {
+                data.push({ text: this.clues[i].text });
+            } else if (this.clues[i]?.drawing) {
+                data.push({ drawing: this.clues[i].drawing });
+            } else {
+                console.error(`Clue input ${i} is empty, skipping`);
+            }
+        }
+        this.state.send({ submit_clues: data });
+        this.clues = [];
+    }
+
+    renderClueInput(keywordIndex, clueIndex) {
+        const clue = this.clues[clueIndex];
+        let input = [];
+
+        if (clue?.drawing) {
+            input.push(html`
+                ${semantic.clueDrawing(this.state, clue.drawing)}
+                <input
+                    type="button"
+                    value="Remove drawing"
+                    @click=${() => {
+                        this.updateClue(clueIndex, null);
+                    }}
+                />
+            `);
+        } else {
+            if (this.state.game.settings.clue_mode !== 'draw') {
+                input.push(html`
+                <input
+                    type="text"
+                    placeholder="Clue"
+                    .value=${clue?.text || ''}
+                    @input=${(e) => {
+                        this.updateClue(clueIndex, { text: e.target.value });
+                    }}
+                />
+                `);
+            }
+            if (this.state.game.settings.clue_mode !== 'text') {
+                input.push(html`
+                <input
+                    type="button"
+                    value=${this.state.game.settings.clue_mode === 'either' ? "Draw it instead!?" : "Draw"}
+                    @click=${() => {
+                        this.updateClue(clueIndex, null);
+                        this.state.clue_input_draw = {
+                            clueIndex,
+                            title: '' + (keywordIndex + 1) + '. ' + this.state.game.keywords[clueIndex],
+                        };
+                        this.state.update();
+                    }}
+                />
+                `);
+            }
+        }
+
+        return html`
+        <tr>
+            <td>${keywordIndex + 1}.</td>
+            <td>${this.state.game.keywords[clueIndex]}</td>
+            <td class="row">${input}</td>
+        </tr>
+        `;
+    }
+
+    render() {
+        const code = this.state.game.inputs.encrypt.code;
+        const deadline = this.state.game.inputs.encrypt.deadline;
+        const disabled = this.clues.length !== code.length || this.clues.some((c) => !c?.text && !c?.drawing);
+
+        return html`
+        <div class="input-action">
+            <h1>It's your turn to give clues!</h1>
+            <div>
+                Code: ${code.map((num) => num + 1).join('-')} (for ${
+                    code.map((num) => this.state.game.keywords[num]).join(', ')
+                })
+            </div>
+            <table class="clue-inputs">
+                ${code.map((keywordIndex, clueIndex) => this.renderClueInput(keywordIndex, clueIndex))}
+            </table>
+            <input
+                id="submit-clues"
+                type="button"
+                value="Proceed"
+                ?disabled=${disabled}
+                @click=${() => this.submitClues()}
+            />
+            ${renderDeadline(this.state, deadline)}
+            ${this.state.clue_input_draw !== null
+                ? html`<paint-overlay
+                    .state=${this.state}
+                    .gameId=${this.state.game.id}
+                    .clueArray=${this.clues}
+                    .clueIndex=${this.state.clue_input_draw.clueIndex}
+                >
+                    <div>
+                        <h2>${this.state.clue_input_draw.title}</h2>
+                        ${renderDeadline(this.state, deadline)}
+                    </div>
+                </paint-overlay>`
+                : null
+            }
+        </div>
+        `;
+    }
+}
+
+customElements.define('clue-giver-view', ClueGiverView);
+
 class TiebreakerInput extends LitElement {
     static properties = {
         index: { type: Number },
@@ -470,43 +618,7 @@ const renderAction = (state) => {
     }
 
     if ('encrypt' in state.game.inputs) {
-        let code = state.game.inputs.encrypt.code;
-        let deadline = state.game.inputs.encrypt.deadline;
-        let disabled = Object.keys(state.clue_inputs).length !== code.length ||
-            state.clue_inputs.some((c) => !c?.text && !c?.drawing);
-        return html`
-        <div class="input-action">
-            <h1>It's your turn to give clues!</h1>
-            <div>
-            Code: ${code.map((num) => num + 1).join('-')} (for ${
-            code.map((num) => state.game.keywords[num]).join(', ')
-        })
-            </div>
-            <table class="clue-inputs">
-                ${code.map((keywordIndex, clueIndex) => renderClueInput(state, keywordIndex, clueIndex))}
-            </table>
-            <input
-                id="submit-clues"
-                type="button"
-                value="Proceed"
-                ?disabled=${disabled}
-                @click=${() => submitClues(state)}
-            />
-            ${renderDeadline(state, deadline)}
-            ${state.clue_input_draw !== null
-                ? html`<paint-overlay
-                    .state=${ state }
-                    .gameId=${ state.game.id }
-                    .clueArray=${ state.clue_inputs }
-                    .clueIndex=${ state.clue_input_draw.clueIndex }
-                ><div>
-                    <h2>${state.clue_input_draw.title}</h2>
-                    ${renderDeadline(state, deadline)}
-                </div></paint-overlay> `
-                : null
-            }            
-        </div>
-        `;
+        return html`<clue-giver-view .state=${state}></clue-giver-view>`;
     } else if ('guess' in state.game.inputs) {
         let intercept = state.game.inputs.guess.intercept;
         let decipher = state.game.inputs.guess.decipher;
