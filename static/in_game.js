@@ -1,6 +1,5 @@
 import { html } from 'https://unpkg.com/lit?module';
 import semantic from './semantic.js';
-import './paint.js';
 
 const renderKeywords = (state) => {
     return html`

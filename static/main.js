@@ -4,6 +4,7 @@ import viewInGame from './in_game.js';
 import topbar from './topbar.js';
 import sidebar from './sidebar.js';
 import './components/nick.js';
+import './components/paint.js';
 
 class AppRoot extends LitElement {
     static properties = {
