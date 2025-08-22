@@ -30,7 +30,6 @@ const renderAction = (state) => {
 
     // do state resets if needed
     if (!('encrypt' in state.game.inputs)) {
-        state.clue_inputs = [];
         state.clue_input_draw = null;
     }
 
