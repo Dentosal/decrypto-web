@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'https://unpkg.com/lit?module';
 
 class DeadlineDisplay extends LitElement {
     static properties = {
+        game: { type: Object },
         deadline: { type: Object },
     };
 
@@ -32,9 +33,13 @@ class DeadlineDisplay extends LitElement {
             deadlineElement.innerText = secondsLeft;
             if (secondsLeft < 0) {
                 secondsLeft = 0;
-                let inputs = state.game?.in_game?.inputs;
+                let inputs = this.game?.in_game?.inputs;
                 if (inputs !== null) {
-                    state.send({ trigger_timers: null });
+                    this.dispatchEvent(new CustomEvent('send-cmd', {
+                        detail: {trigger_timers: null},
+                        bubbles: true,
+                        composed: true,
+                    }));
                 }
             }
         }

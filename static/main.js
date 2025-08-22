@@ -16,10 +16,9 @@ import './components/waiting_for.js';
 class AppRoot extends LitElement {
     static properties = {
         ws: { type: Object },
-        user_info: { type: Object },
         game: { type: Object },
+        user_info: { type: Object },
         global_chat_input: { type: String },
-        clue_input_draw: { type: Object },
         override_view: { type: String },
         version: { type: Object },
         wordlists: { type: Array },
@@ -34,7 +33,6 @@ class AppRoot extends LitElement {
         this.user_info = null;
         this.game = null;
         this.global_chat_input = '';
-        this.clue_input_draw = null;
         this.override_view = null;
         this.version = null;
         this.wordlists = [];
@@ -51,6 +49,8 @@ class AppRoot extends LitElement {
 
         // HACK: for debugging, expose the inner state
         window.state = this;
+
+        this.addEventListener('send-cmd', e => this.send(e.detail));
 
         document.getElementById('init-load').innnerText = 'Initializing...';
 
@@ -97,6 +97,8 @@ class AppRoot extends LitElement {
         if (msg.state) {
             this.user_info = msg.state.user_info;
             this.game = msg.state.game;
+            this.requestUpdate();
+
             localStorage.setItem('secret', this.user_info.secret);
             // HACK: scroll to bottom of chat messages
             // TODO: do this properly

@@ -3,13 +3,15 @@ import semantic from './semantic.js';
 
 const kickButton = (state, playerId) => {
     return html`
-        <button class="kick-button" @click=${() => {
-            state.dispatchEvent(new CustomEvent('send-cmd', {
-                detail: { kick: playerId },
-                bubbles: true,
-                composed: true,
-            }));
-        }}>
+        <button class="kick-button"        
+            @click=${() => {
+                state.dispatchEvent(new CustomEvent('send-cmd', {
+                    detail: { kick: playerId },
+                    bubbles: true,
+                    composed: true,
+                }));
+            }}
+        >
             Kick
         </button>
     `;

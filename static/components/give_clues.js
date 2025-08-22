@@ -6,6 +6,7 @@ class ClueGiverView extends LitElement {
     static properties = {
         state: { type: Object },
         clues: { type: Array },
+        paintView: { type: Object },
     };
 
     constructor() {
@@ -26,7 +27,7 @@ class ClueGiverView extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
-        const codeLength = this.state.game.inputs.encrypt.code.length;
+        const codeLength = this.game.inputs.encrypt.code.length;
         this.clues = Array(codeLength).fill(null);
     }
 
@@ -46,7 +47,13 @@ class ClueGiverView extends LitElement {
                 console.error(`Clue input ${i} is empty, skipping`);
             }
         }
-        this.state.send({ submit_clues: data });
+
+        this.dispatchEvent(new CustomEvent('send-cmd', {
+            detail: { submit_clues: data },
+            bubbles: true,
+            composed: true,
+        }));
+
         this.clues = [];
     }
 
@@ -66,7 +73,7 @@ class ClueGiverView extends LitElement {
                 />
             `);
         } else {
-            if (this.state.game.settings.clue_mode !== 'draw') {
+            if (this.game.settings.clue_mode !== 'draw') {
                 input.push(html`
                 <input
                     type="text"
@@ -78,18 +85,17 @@ class ClueGiverView extends LitElement {
                 />
                 `);
             }
-            if (this.state.game.settings.clue_mode !== 'text') {
+            if (this.game.settings.clue_mode !== 'text') {
                 input.push(html`
                 <input
                     type="button"
-                    value=${this.state.game.settings.clue_mode === 'either' ? "Draw it instead!?" : "Draw"}
+                    value=${this.game.settings.clue_mode === 'either' ? "Draw it instead!?" : "Draw"}
                     @click=${() => {
                         this.updateClue(clueIndex, null);
-                        this.state.clue_input_draw = {
+                        this.paintView = {
                             clueIndex,
-                            title: '' + (keywordIndex + 1) + '. ' + this.state.game.keywords[clueIndex],
+                            title: '' + (keywordIndex + 1) + '. ' + this.game.keywords[clueIndex],
                         };
-                        this.state.update();
                     }}
                 />
                 `);
@@ -99,15 +105,15 @@ class ClueGiverView extends LitElement {
         return html`
         <tr>
             <td>${keywordIndex + 1}.</td>
-            <td>${this.state.game.keywords[clueIndex]}</td>
+            <td>${this.game.keywords[clueIndex]}</td>
             <td class="row">${input}</td>
         </tr>
         `;
     }
 
     render() {
-        const code = this.state.game.inputs.encrypt.code;
-        const deadline = this.state.game.inputs.encrypt.deadline;
+        const code = this.game.inputs.encrypt.code;
+        const deadline = this.game.inputs.encrypt.deadline;
         const disabled = this.clues.length !== code.length || this.clues.some((c) => !c?.text && !c?.drawing);
 
         return html`
@@ -115,7 +121,7 @@ class ClueGiverView extends LitElement {
             <h1>It's your turn to give clues!</h1>
             <div>
                 Code: ${code.map((num) => num + 1).join('-')} (for ${
-                    code.map((num) => this.state.game.keywords[num]).join(', ')
+                    code.map((num) => this.game.keywords[num]).join(', ')
                 })
             </div>
             <table class="clue-inputs">
@@ -128,17 +134,17 @@ class ClueGiverView extends LitElement {
                 ?disabled=${disabled}
                 @click=${() => this.submitClues()}
             />
-            <deadline-display .state=${this.state} .deadline=${deadline}></deadline-display>
-            ${this.state.clue_input_draw !== null
+            <deadline-display .game=${this.game} .deadline=${deadline}></deadline-display>
+            ${this.paintView
                 ? html`<paint-overlay
-                    .state=${this.state}
-                    .gameId=${this.state.game.id}
-                    .clueArray=${this.clues}
-                    .clueIndex=${this.state.clue_input_draw.clueIndex}
+                    .gameId=${this.game.id}
+                    @drawing-saved=${(e) => {
+                        this.clues[this.paintView] = { drawing: e.detail };
+                    }}
                 >
                     <div>
-                        <h2>${this.state.clue_input_draw.title}</h2>
-                        <deadline-display .state=${this.state} .deadline=${deadline}></deadline-display>
+                        <h2>${this.paintView.title}</h2>
+                        <deadline-display .game=${this.game} .deadline=${deadline}></deadline-display>
                     </div>
                 </paint-overlay>`
                 : null

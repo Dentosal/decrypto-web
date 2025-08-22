@@ -2,22 +2,24 @@ import { LitElement, html, css } from 'https://unpkg.com/lit?module';
 
 class HurryUpButton extends LitElement {
     static properties = {
-        state: { type: Object },
+        game: { type: Object },
         deadline: { type: Object },
     };
 
     handleClick() {
-        const { state } = this;
-        state.send({
-            frustrated: {
-                encrypting: ('waiting_for_encryptors' in state.game.inputs),
-                teams: (
-                    ('waiting_for_encryptors' in state.game.inputs)
-                        ? state.game.inputs.waiting_for_encryptors.teams
-                        : state.game.inputs.waiting_for_guessers.teams
-                ),
-            },
-        });
+        this.dispatchEvent(new CustomEvent('send-cmd', {
+            detail: {
+                frustrated: {
+                    encrypting: ('waiting_for_encryptors' in this.game.inputs),
+                    teams: (
+                        ('waiting_for_encryptors' in this.game.inputs)
+                            ? this.game.inputs.waiting_for_encryptors.teams
+                            : this.game.inputs.waiting_for_guessers.teams
+                    ),
+                } },
+            bubbles: true,
+            composed: true,
+        }));
     }
 
     render() {

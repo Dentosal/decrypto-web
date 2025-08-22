@@ -4,8 +4,15 @@ import semantic from '../semantic.js';
 
 class DecipherView extends LitElement {
     static properties = {
-        state: { type: Object },
+        game: { type: Object },
+        user_info: { type: Object },
+        value: { type: String },
     };
+
+    constructor() {
+        super();
+        this.value = '';
+    }
 
     static get styles() {
         return [
@@ -14,7 +21,6 @@ class DecipherView extends LitElement {
     }
 
     parseGuess(guess) {
-        const { state } = this;
         guess = guess.trim();
         let parts = guess.split('-');
         if (parts.length !== state.game.settings.clue_count) {
@@ -41,32 +47,33 @@ class DecipherView extends LitElement {
                 e.target.setCustomValidity(e.target.title);
                 e.target.reportValidity();
             } else {
-                this.state.send({ submit_decipher: guess });
+                this.dispatchEvent(new CustomEvent('send-cmd', {
+                    detail: { submit_decipher: guess },
+                    bubbles: true,
+                    composed: true,
+                }));
             }
         }
     }
 
     render() {
-        const myTeam = this.state.game.players.find((p) => p.id === this.state.user_info.id).team;
+        const myTeam = this.game.players.find((p) => p.id === this.user_info.id).team;
         return html`
             <div class="input-action">
                 <h1>Attempt to decipher your clues:</h1>
-                <ul>
-                    ${
-            this.state.game.current_round[+myTeam].clues === null
-                ? html`<li>Encryptor ran out of time, no clues for you.</li>`
-                : this.state.game.current_round[+myTeam].clues.map((clue) => html`<li>${semantic.clue(this.state, clue)}</li>`)
-        }
-                </ul>
+                <ul>${this.game.current_round[+myTeam].clues === null
+                    ? html`<li>Encryptor ran out of time, no clues for you.</li>`
+                    : this.game.current_round[+myTeam].clues.map((clue) => html`<li>${semantic.clue(this.state, clue)}</li>`)
+                }</ul>
                 <input
                     type="text"
                     placeholder="${
-            [...Array(this.state.game.settings.clue_count).keys().map((i) => i + 1)].join('-')
-        }"
+                        [...Array(this.game.settings.clue_count).keys().map((i) => i + 1)].join('-')
+                    }"
                     required
                     title="Enter your guess as a sequence of numbers, separated by dashes (e.g. 1-2-3)"
-                    .value=${this.state.decipher_input || ''}
-                    @input=${(e) => this.state.decipher_input = e.target.value}
+                    .value=${this.value}
+                    @input=${(e) => this.value = e.target.value}
                     @keypress=${this.handleKeyPress.bind(this)}
                 >
             </div>

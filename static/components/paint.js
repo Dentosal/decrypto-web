@@ -3,26 +3,6 @@ import { html, css, LitElement } from 'https://unpkg.com/lit?module';
 const width = 800;
 const height = 600;
 
-const saveDrawing = async (canvas, state, gameId, clueArray, clueIndex) => {
-    canvas.toBlob(async (img) => {
-        if (img) {
-            let r = await fetch('/drawing/' + gameId, {
-                method: 'POST',
-                body: img,
-                headers: {
-                    'Content-Type': 'image/png',
-                },
-            });
-            let draingId = await r.text();
-            clueArray[clueIndex] = { drawing: draingId };
-            state.clue_input_draw = null; // Close the paint overlay
-            state.update();
-        } else {
-            console.error('Failed to create image blob');
-        }
-    });
-};
-
 const dist = (a, b) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
 
 // Flood fill, partially ChatGPT-written to match what real paint programs do
@@ -116,10 +96,7 @@ const floodFill = (ctx, startX, startY, fillColor, tolerance = 50, expand = 1) =
 
 class PaintOverlay extends LitElement {
     static properties = {
-        state: { type: Object },
         gameId: { type: String },
-        clueArray: { type: Array },
-        clueIndex: { type: Number },
         tool: { type: String },
         brushSize: { type: Number },
         currentColor: { type: String },
@@ -221,6 +198,28 @@ class PaintOverlay extends LitElement {
         }
     `;
 
+    saveDrawing() {
+        this.canvas.toBlob(async (img) => {
+            if (img) {
+                let r = await fetch('/drawing/' + this.gameId, {
+                    method: 'POST',
+                    body: img,
+                    headers: {
+                        'Content-Type': 'image/png',
+                    },
+                });
+                let drawingId = await r.text();
+                this.dispatchEvent(new CustomEvent('drawing-saved', {
+                    detail: drawingId,
+                    bubbles: true,
+                    composed: true,
+                }));
+            } else {
+                console.error('Failed to create image blob');
+            }
+        });
+    };
+
     render() {
         return html`
         <div class="paint-overlay row">
@@ -295,9 +294,7 @@ class PaintOverlay extends LitElement {
                         }}
                     />
                     <input type="button" class="tool save" value="Save"
-                        @click=${e => {
-                            saveDrawing(this.canvas, this.state, this.gameId, this.clueArray, this.clueIndex);
-                        }}
+                        @click=${e => saveDrawing()}}
                     />
                 </div>
             </div>

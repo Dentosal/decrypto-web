@@ -13,6 +13,7 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     StaleElementReferenceException,
     DetachedShadowRootException,
+    NoSuchShadowRootException,
 )
 
 
@@ -200,32 +201,40 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
 
     try:
         try:
-            view = driver.find_element(By.CSS_SELECTOR, "clue-giver-view")
+            view = driver.find_element(By.CSS_SELECTOR, "clue-giver-view").shadow_root
         except NoSuchElementException:
             view = None
+        except NoSuchShadowRootException:
+            view = None
         if view is not None:
-            do_input_clue_giver(view.shadow_root)
+            do_input_clue_giver(view)
 
         try:
-            view = driver.find_element(By.CSS_SELECTOR, "decipher-view")
+            view = driver.find_element(By.CSS_SELECTOR, "decipher-view").shadow_root
         except NoSuchElementException:
             view = None
+        except NoSuchShadowRootException:
+            view = None
         if view is not None:
-            do_input_decipher(view.shadow_root, index, round_index, strategy)
+            do_input_decipher(view, index, round_index, strategy)
 
         try:
-            view = driver.find_element(By.CSS_SELECTOR, "intercept-view")
+            view = driver.find_element(By.CSS_SELECTOR, "intercept-view").shadow_root
         except NoSuchElementException:
             view = None
+        except NoSuchShadowRootException:
+            view = None
         if view is not None:
-            do_input_intercept(view.shadow_root, index, round_index, strategy)
+            do_input_intercept(view, index, round_index, strategy)
 
         try:
-            view = driver.find_element(By.CSS_SELECTOR, "tiebreaker-view")
+            view = driver.find_element(By.CSS_SELECTOR, "tiebreaker-view").shadow_root
         except NoSuchElementException:
             view = None
+        except NoSuchShadowRootException:
+            view = None
         if view is not None:
-            do_input_tiebreaker(view.shadow_root, index, round_index, strategy)
+            do_input_tiebreaker(view, index, round_index, strategy)
     except StaleElementReferenceException:
         return None
     except DetachedShadowRootException:

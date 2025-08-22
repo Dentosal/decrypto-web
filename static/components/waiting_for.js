@@ -3,7 +3,7 @@ import { inputActionCSS } from './common.js';
 
 class WaitingFor extends LitElement {
     static properties = {
-        state: { type: Object },
+        game: { type: Object },
         deadline: { type: String },
     };
 
@@ -17,9 +17,9 @@ class WaitingFor extends LitElement {
         return html`
         <div class="waiting input-action">
             <h1><slot></slot></h1>
-            <hurry-up-button .state=${this.state} .deadline=${this.deadline}></hurry-up-button>
+            <hurry-up-button .game=${this.game} .deadline=${this.deadline}></hurry-up-button>
         </div>
-        <deadline-display .deadline=${this.deadline}></deadline-display>
+        <deadline-display .game=${this.game} .deadline=${this.deadline}></deadline-display>
         `;
     }
 }

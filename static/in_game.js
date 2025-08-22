@@ -2,12 +2,12 @@ import { html } from 'https://unpkg.com/lit?module';
 import semantic from './semantic.js';
 
 
-const renderKeywords = (state) => {
+const renderKeywords = (game) => {
     return html`
     <div class="row keywords">
         Team keywords:
         ${
-        state.game.keywords.map((keyword, index) =>
+        game.keywords.map((keyword, index) =>
             html`
             <div>${index + 1}. <span class="keyword">${keyword}</span></div>
         `
@@ -17,55 +17,51 @@ const renderKeywords = (state) => {
 };
 
 
-const renderAction = (state) => {
-    let myTeam = state.game.players.find((p) => p.id === state.user_info.id).team;
+const renderAction = (game, user_info) => {
+    let myTeam = game.players.find((p) => p.id === user_info.id).team;
 
-    // do state resets if needed
-    if (!('encrypt' in state.game.inputs)) {
-        state.clue_input_draw = null;
-    }
-
-    if ('encrypt' in state.game.inputs) {
-        let deadline = state.game.inputs.encrypt.deadline;
+    if ('encrypt' in game.inputs) {
+        let deadline = game.inputs.encrypt.deadline;
         return html`
-            <clue-giver-view .state=${state}></clue-giver-view>
-            <deadline-display .deadline=${deadline}></deadline-display>
+            <clue-giver-view .game=${game} .user_info=${user_info}></clue-giver-view>
+            <deadline-display .game=${game} .deadline=${deadline}></deadline-display>
         `;
-    } else if ('guess' in state.game.inputs) {
-        let intercept = state.game.inputs.guess.intercept;
-        let decipher = state.game.inputs.guess.decipher;
-        let deadline = state.game.inputs.guess.deadline;
+    } else if ('guess' in game.inputs) {
+        let intercept = game.inputs.guess.intercept;
+        let decipher = game.inputs.guess.decipher;
+        let deadline = game.inputs.guess.deadline;
         return html`${[
-            decipher ? html`<decipher-view .state=${state}></decipher-view>` : null,
-            intercept ? html`<intercept-view .state=${state}></intercept-view>` : null,
-            deadline ? html`<deadline-display .deadline=${deadline}></deadline-display>` : null,
+            decipher ? html`<decipher-view .game=${game} .user_info=${user_info}></decipher-view>` : null,
+            intercept ? html`<intercept-view .game=${game} .user_info=${user_info}></intercept-view>` : null,
+            deadline ? html`<deadline-display .game=${game} .deadline=${deadline}></deadline-display>` : null,
         ]}`;
-    } else if ('waiting_for_encryptors' in state.game.inputs || 'waiting_for_guessers' in state.game.inputs) {
-        let waitingFor = state.game.inputs.waiting_for_encryptors?.teams || state.game.inputs.waiting_for_guessers?.teams;
-        let deadline = state.game.inputs.waiting_for_encryptors?.deadline || state.game.inputs.waiting_for_guessers?.deadline;
+    } else if ('waiting_for_encryptors' in game.inputs || 'waiting_for_guessers' in game.inputs) {
+        let waitingFor = game.inputs.waiting_for_encryptors?.teams || game.inputs.waiting_for_guessers?.teams;
+        let deadline = game.inputs.waiting_for_encryptors?.deadline || game.inputs.waiting_for_guessers?.deadline;
         let waitText;
         if (waitingFor[+myTeam] && waitingFor[+!myTeam]) {
-            waitText = state.game.inputs.waiting_for_encryptors
+            waitText = game.inputs.waiting_for_encryptors
                 ? 'Waiting for both teams to finish encrypting...'
                 : 'Waiting for both teams to finish guessing...';
         } else if (waitingFor[+myTeam]) {
-            waitText = state.game.inputs.waiting_for_encryptors
+            waitText = game.inputs.waiting_for_encryptors
                 ? 'Waiting for your team to finish encrypting...'
                 : 'Waiting for your team to finish guessing...';
         } else {
-            waitText = state.game.inputs.waiting_for_encryptors
+            waitText = game.inputs.waiting_for_encryptors
                 ? 'Waiting for the other team to finish encrypting...'
                 : 'Waiting for the other team to finish guessing...';
         }
         return html`<waiting-for .state=${state} .deadline=${deadline}>${waitText}</waiting-for>`;
-    } else if ('tiebreaker' in state.game.inputs) {
-        let deadline = state.game.inputs.tiebreaker.deadline;
+    } else if ('tiebreaker' in game.inputs) {
+        let deadline = game.inputs.tiebreaker.deadline;
         return html`
             <tiebreaker-view
-                .state=${state}
+                .game=${game}
+                .user_info=${user_info}
                 .deadline=${deadline}
             ></tiebreaker-view>
-            ${deadline ? html`<deadline-display .deadline=${deadline}></deadline-display>` : null}
+            ${deadline ? html`<deadline-display .game=${game} .deadline=${deadline}></deadline-display>` : null}
         `;
     } else {
         return html`Error: unknown game state ???`;
@@ -246,8 +242,8 @@ export default function viewInGame(state) {
 
     return html`
     <div id="in_game">
-        ${renderKeywords(state)}
-        ${renderAction(state)}
+        ${renderKeywords(state.game)}
+        ${renderAction(state.game, state.user_info)}
         <div class="spacer"></div>
         ${renderInterceptionMatrix(state, !myTeam)}
         ${renderRoundHistory(state)}
