@@ -20,6 +20,7 @@ class SharedState:
         self.stop_event = threading.Event()
         self.invite_link = None
         self.results = {}
+        self.first_error = None
 
 
 def set_nick_if_needed(driver, index: int):
@@ -212,6 +213,15 @@ class StrategyInput:
         )
 
 
+class JsError(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+    def __str__(self):
+        return self.message
+
+
 def simple_player(
     index: int,
     port: int,
@@ -225,6 +235,9 @@ def simple_player(
 
         # lobby/join loop
         while not shared.stop_event.is_set():
+            if err := driver.execute_script("return window.CATCH_ERROR;"):
+                raise JsError(err.replace(f"http://127.0.0.1:{port}/", "static/"))
+
             set_nick_if_needed(driver, index)
 
             if index == 0 and shared.invite_link is None:
@@ -244,8 +257,9 @@ def simple_player(
                 shared.results[index] = game_result
                 return
             time.sleep(0.5)
-    except:
+    except Exception as e:
+        if shared.first_error is None:
+            shared.first_error = e
         shared.stop_event.set()
-        raise
     finally:
         driver.quit()

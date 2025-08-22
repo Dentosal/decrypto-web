@@ -3,6 +3,7 @@ import tempfile
 import time
 import platform
 from os import environ
+from pathlib import Path
 
 import portpicker
 import pytest
@@ -55,4 +56,7 @@ def new_isolated_firefox():
                 "/Applications/Firefox Nightly.app/Contents/MacOS/firefox"
             )
     options.set_preference("browser.startup.homepage", "about:blank")
-    return webdriver.Firefox(options=options)
+    driver = webdriver.Firefox(options=options)
+    ext_path = (Path(__file__).parent / "ext_error_catch").resolve()
+    driver.install_addon(ext_path, temporary=True)
+    return driver

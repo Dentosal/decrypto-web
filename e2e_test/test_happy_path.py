@@ -19,6 +19,9 @@ def run_game(strategy, count=4):
         for t in ts:
             t.join()
 
+    if shared.stop_event.is_set():
+        raise shared.first_error or RuntimeError("Unknown error occurred")
+
     results = shared.results
     if results[0] == "draw":
         return None
