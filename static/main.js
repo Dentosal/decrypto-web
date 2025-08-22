@@ -3,13 +3,13 @@ import viewLobby from './lobby.js';
 import viewInGame from './in_game.js';
 import topbar from './topbar.js';
 import sidebar from './sidebar.js';
+import './components/nick.js';
 
 const state = {
     version: null,
     ws: null,
     user_info: null,
     game: null,
-    nickname_input: '',
     decipher_input: '',
     intercept_input: '',
     global_chat_input: '',
@@ -82,33 +82,6 @@ const send = (msg) => {
     state.ws.send(JSON.stringify(msg));
 };
 
-const viewNickRequired = (state) => {
-    const onInput = (e) => {
-        state.nickname_input = e.target.value;
-    };
-    const onKeyPress = (e) => {
-        if (e.key === 'Enter') {
-            send({ set_nick: state.nickname_input });
-            state.override_view = null;
-        }
-    };
-
-    return html`
-    <div id="nick-required">
-        <p>Select a nickname:</p>
-        <input
-            id="nick-input"
-            type="text"
-            placeholder="Nickname"
-            .value=${state.nickname_input}
-            @input=${onInput}
-            @keypress=${onKeyPress}
-            autofocus
-        />
-    </div>
-    `;
-};
-
 const createLobby = () => {
     send({ create_lobby: null });
 };
@@ -127,7 +100,13 @@ const viewNotInLobby = () => {
 
 const currentView = () => {
     if (!state.user_info?.nick || state.override_view === 'nick_required') {
-        return html`${[topbar(state), viewNickRequired(state)]}`;
+        return html`${[
+            topbar(state), 
+            html`<nickname-input @set=${e => {
+                send({ set_nick: e.detail });
+                state.override_view = null;
+            }}></nickname-input>`
+        ]}`;
     }
 
     if (window.location.hash.startsWith('#join_')) {
@@ -158,8 +137,6 @@ const currentView = () => {
 
 const update = () => {
     render(currentView(), document.getElementById('app'));
-    // Auto-focus on nickname input if it's visible
-    document.getElementById('nick-input')?.focus();
     // Auto-scroll to bottom of messages
     // TODO: only do this if new messages were added
     for (const el of document.querySelectorAll('.messages')) {

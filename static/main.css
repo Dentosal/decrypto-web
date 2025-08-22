@@ -92,10 +92,6 @@ body {
     background-color: #cec;
 }
 
-#nick-required {
-    margin: 1rem;
-}
-
 #sidebar {
     min-width: 350px;
     gap: 0;

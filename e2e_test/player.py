@@ -24,9 +24,10 @@ class SharedState:
 
 def set_nick_if_needed(driver, index: int):
     try:
-        el = driver.find_element(By.CSS_SELECTOR, "input#nick-input")
+        root = driver.find_element(By.CSS_SELECTOR, "nickname-input")
     except NoSuchElementException:
         return
+    el = root.shadow_root.find_element(By.CSS_SELECTOR, "input")
     if el.get_attribute("value") == "":
         el.send_keys(f"client {index}")
         time.sleep(0.2)
