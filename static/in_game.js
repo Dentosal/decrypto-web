@@ -1,6 +1,19 @@
 import { LitElement, html, css } from 'https://unpkg.com/lit?module';
 import semantic from './semantic.js';
 
+
+const inputActionCSS = css`
+.input-action {
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+}
+.input-action h1 {
+    margin: 0;
+    font-size: 1.2em;
+}
+`;
+
 const renderKeywords = (state) => {
     return html`
     <div class="row keywords">
@@ -138,17 +151,11 @@ class DecipherView extends LitElement {
         state: { type: Object },
     };
 
-    static styles = css`
-        .input-action {
-            padding: 10px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-        }
-        .input-action h1 {
-            margin: 0;
-            font-size: 1.2em;
-        }
-    `;
+    static get styles() {
+        return [
+            inputActionCSS,
+        ];
+    }
 
     parseGuess(guess) {
         const { state } = this;
@@ -222,17 +229,11 @@ class InterceptView extends LitElement {
         state: { type: Object },
     };
 
-    static styles = css`
-        .input-action {
-            padding: 10px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-        }
-        .input-action h1 {
-            margin: 0;
-            font-size: 1.2em;
-        }
-    `;
+    static get styles() {
+        return [
+            inputActionCSS,
+        ];
+    }
 
     parseGuess(guess) {
         const { state } = this;
@@ -302,18 +303,6 @@ const renderDecipher = (state) => {
 const renderIntercept = (state) => {
     return html`<intercept-view .state=${state}></intercept-view>`;
 };
-
-const inputActionCSS = css`
-.input-action {
-    padding: 10px;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-}
-.input-action h1 {
-    margin: 0;
-    font-size: 1.2em;
-}
-`;
 
 class TiebreakerInput extends LitElement {
     static properties = {
