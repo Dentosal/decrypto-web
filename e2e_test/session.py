@@ -13,6 +13,8 @@ from selenium.webdriver.firefox.options import Options
 
 
 class GameServer:
+    """Runs an instance of the game server on a random port. Used as a context manager."""
+
     def __init__(self):
         self.port = portpicker.pick_unused_port()
         self.process = subprocess.Popen(

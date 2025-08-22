@@ -1,9 +1,15 @@
+"""
+An automatic player for the game, which interacts with the web interface.
+Given a strategy function, it will play the game by simulating user input.
+This code is designed to be run in a separate thread for each player.
+"""
+
 from typing import Callable, Optional
 from dataclasses import dataclass
 import time
 import threading
 
-from .session import new_isolated_firefox
+from .session import GameServer, new_isolated_firefox
 
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
@@ -263,3 +269,35 @@ def simple_player(
         shared.stop_event.set()
     finally:
         driver.quit()
+
+
+def run_game(strategy: Callable[[StrategyInput], bool], count=4) -> Optional[int]:
+    """
+    Run a game with the specified strategy and number of players.
+    Returns the index of the winning team (0 or 1) or None for a draw.
+    """
+
+    assert count >= 4, "At least one four players are required"
+    shared = SharedState()
+    with GameServer() as port:
+        ts = [
+            threading.Thread(target=simple_player, args=(i, port, shared, strategy))
+            for i in range(count)
+        ]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
+
+    if shared.stop_event.is_set():
+        raise shared.first_error or RuntimeError("Unknown error occurred")
+
+    results = shared.results
+    if results[0] == "draw":
+        return None
+    elif results[0] == "win":
+        return 0
+    elif results[0] == "loss":
+        return 1
+    else:
+        raise ValueError(f"Unexpected game result: {results}")
