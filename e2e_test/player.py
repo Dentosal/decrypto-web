@@ -107,7 +107,59 @@ def extract_round_index(driver) -> Optional[int]:
         return None
 
 
-def do_input_tiebreaker(driver, root):
+def do_input_decipher(root, index, round_index, strategy):
+    correct = "-".join(
+        ct.get_attribute("innerText").split("=")[1]
+        for ct in root.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
+    )
+    use_correct = strategy(
+        StrategyInput(
+            player_index=index,
+            team=bool(index % 2),
+            round_index=round_index,
+            situation="guess",
+        )
+    )
+    assert correct, "No clues found for decipher"
+    value = correct if use_correct else correct[::-1]
+    textbox = root.find_element(By.CSS_SELECTOR, "input[type=text]")
+    if textbox.get_attribute("value") == "":
+        textbox.send_keys(value)
+        textbox.send_keys(Keys.ENTER)
+        time.sleep(0.1)
+    elif textbox.get_attribute("value") == value:
+        textbox.send_keys(Keys.ENTER)
+    else:
+        textbox.clear()
+
+
+def do_input_intercept(root, index, round_index, strategy):
+    correct = "-".join(
+        ct.get_attribute("innerText").split("=")[1]
+        for ct in root.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
+    )
+    assert correct, "No clues found for intercept"
+    use_correct = strategy(
+        StrategyInput(
+            player_index=index,
+            team=bool(index % 2),
+            round_index=round_index,
+            situation="intercept",
+        )
+    )
+    value = correct if use_correct else correct[::-1]
+    textbox = root.find_element(By.CSS_SELECTOR, "input[type=text]")
+    if textbox.get_attribute("value") == "":
+        textbox.send_keys(value)
+        textbox.send_keys(Keys.ENTER)
+        time.sleep(0.1)
+    elif textbox.get_attribute("value") == value:
+        textbox.send_keys(Keys.ENTER)
+    else:
+        textbox.clear()
+
+
+def do_input_tiebreaker(root, index, round_index, strategy):
     for inp in root.find_elements(By.CSS_SELECTOR, "tiebreaker-input"):
         textbox = inp.shadow_root.find_element(By.CSS_SELECTOR, "input[type=text]")
         if textbox.get_attribute("value") == "":
@@ -127,11 +179,28 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
         return None
 
     try:
-        view = driver.find_element(By.CSS_SELECTOR, "tiebreaker-view")
-    except NoSuchElementException:
-        view = None
-    if view is not None:
-        do_input_tiebreaker(driver, view.shadow_root)
+        try:
+            view = driver.find_element(By.CSS_SELECTOR, "decipher-view")
+        except NoSuchElementException:
+            view = None
+        if view is not None:
+            do_input_decipher(view.shadow_root, index, round_index, strategy)
+
+        try:
+            view = driver.find_element(By.CSS_SELECTOR, "intercept-view")
+        except NoSuchElementException:
+            view = None
+        if view is not None:
+            do_input_intercept(view.shadow_root, index, round_index, strategy)
+
+        try:
+            view = driver.find_element(By.CSS_SELECTOR, "tiebreaker-view")
+        except NoSuchElementException:
+            view = None
+        if view is not None:
+            do_input_tiebreaker(view.shadow_root, index, round_index, strategy)
+    except StaleElementReferenceException:
+        return None
 
     try:
         for ia in driver.find_elements(By.CSS_SELECTOR, "div.input-action"):
@@ -158,45 +227,9 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
                     submit.click()
                 time.sleep(0.1)
             elif "decipher your clues" in h1:
-                correct = "-".join(
-                    ct.get_attribute("innerText").split("=")[1]
-                    for ct in ia.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
-                )
-                use_correct = strategy(
-                    StrategyInput(
-                        player_index=index,
-                        team=bool(index % 2),
-                        round_index=round_index,
-                        situation="guess",
-                    )
-                )
-                textbox = ia.find_element(By.CSS_SELECTOR, "input[type=text]")
-                if textbox.get_attribute("value") == "":
-                    textbox.send_keys(correct if use_correct else correct[::-1])
-                    textbox.send_keys(Keys.ENTER)
-                    time.sleep(0.1)
-                else:
-                    textbox.clear()
+                pass
             elif "Attempt interception" in h1:
-                correct = "-".join(
-                    ct.get_attribute("innerText").split("=")[1]
-                    for ct in ia.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
-                )
-                use_correct = strategy(
-                    StrategyInput(
-                        player_index=index,
-                        team=bool(index % 2),
-                        round_index=round_index,
-                        situation="intercept",
-                    )
-                )
-                textbox = ia.find_element(By.CSS_SELECTOR, "input[type=text]")
-                if textbox.get_attribute("value") == "":
-                    textbox.send_keys(correct if use_correct else correct[::-1])
-                    textbox.send_keys(Keys.ENTER)
-                    time.sleep(0.1)
-                else:
-                    textbox.clear()
+                pass
             elif "Waiting for" in h1:
                 pass
             elif "Tiebreaker" in h1:

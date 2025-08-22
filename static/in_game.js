@@ -133,114 +133,174 @@ const renderDeadline = (state, deadline) => {
     return null;
 };
 
-const parseGuess = (state, guess) => {
-    guess = guess.trim();
-    let parts = guess.split('-');
-    if (parts.length !== state.game.settings.clue_count) {
-        return null;
-    }
-    let result = [];
-    for (let i = 0; i < parts.length; i += 1) {
-        let num = parseInt(parts[i], 10);
-        if (isNaN(num) || num < 1 || num > state.game.settings.keyword_count) {
-            return null; // Invalid guess
+class DecipherView extends LitElement {
+    static properties = {
+        state: { type: Object },
+    };
+
+    static styles = css`
+        .input-action {
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
         }
-        result.push(num - 1); // Convert to zero-based index
-    }
-    if (new Set(result).size !== result.length) {
-        return null; // Duplicates in the guess
-    }
-    return result;
-};
+        .input-action h1 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+    `;
 
-const renderDecipher = (state) => {
-    let myTeam = state.game.players.find((p) => p.id === state.user_info.id).team;
+    parseGuess(guess) {
+        const { state } = this;
+        guess = guess.trim();
+        let parts = guess.split('-');
+        if (parts.length !== state.game.settings.clue_count) {
+            return null;
+        }
+        let result = [];
+        for (let i = 0; i < parts.length; i += 1) {
+            let num = parseInt(parts[i], 10);
+            if (isNaN(num) || num < 1 || num > state.game.settings.keyword_count) {
+                return null; // Invalid guess
+            }
+            result.push(num - 1); // Convert to zero-based index
+        }
+        if (new Set(result).size !== result.length) {
+            return null; // Duplicates in the guess
+        }
+        return result;
+    }
 
-    const onKeyPress = (e) => {
+    handleKeyPress(e) {
         if (e.key === 'Enter') {
-            let guess = parseGuess(state, e.target.value);
+            let guess = this.parseGuess(e.target.value);
             if (guess === null) {
                 e.target.setCustomValidity(e.target.title);
                 e.target.reportValidity();
             } else {
-                state.dispatchEvent(new CustomEvent('send-cmd', {
+                this.dispatchEvent(new CustomEvent('send-cmd', {
                     detail: { submit_decipher: guess },
                     bubbles: true,
                     composed: true,
                 }));
             }
         }
+    }
+
+    render() {
+        const myTeam = this.state.game.players.find((p) => p.id === this.state.user_info.id).team;
+        return html`
+            <div class="input-action">
+                <h1>Attempt to decipher your clues:</h1>
+                <ul>
+                    ${
+            this.state.game.current_round[+myTeam].clues === null
+                ? html`<li>Encryptor ran out of time, no clues for you.</li>`
+                : this.state.game.current_round[+myTeam].clues.map((clue) => html`<li>${semantic.clue(this.state, clue)}</li>`)
+        }
+                </ul>
+                <input
+                    type="text"
+                    placeholder="${
+            [...Array(this.state.game.settings.clue_count).keys().map((i) => i + 1)].join('-')
+        }"
+                    required
+                    title="Enter your guess as a sequence of numbers, separated by dashes (e.g. 1-2-3)"
+                    .value=${this.state.decipher_input || ''}
+                    @input=${(e) => this.state.decipher_input = e.target.value}
+                    @keypress=${this.handleKeyPress.bind(this)}
+                >
+            </div>
+        `;
+    }
+}
+
+customElements.define('decipher-view', DecipherView);
+
+class InterceptView extends LitElement {
+    static properties = {
+        state: { type: Object },
     };
 
-    return html`
-    <div class="input-action">
-        <h1>Attempt to decipher your clues:</h1>
-        <ul>
-            ${
-        state.game.current_round[+myTeam].clues === null
-            ? html`<li>Encryptor ran out of time, no clues for you.</li>`
-            : state.game.current_round[+myTeam].clues.map((clue) => html`<li>${semantic.clue(state, clue)}</li>`)
-    }
-        </ul>
-        <input
-            type="text"
-            placeholder="${
-        [...Array(state.game.settings.clue_count).keys().map((i) => i + 1)].join(
-            '-',
-        )
-    }"
-            required
-            title="Enter your guess as a sequence of numbers, separated by dashes (e.g. 1-2-3)"
-            .value=${state.decipher_input || ''}
-            @input=${(e) => state.decipher_input = e.target.value}
-            @keypress=${onKeyPress}
-        >
-    </div>
+    static styles = css`
+        .input-action {
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .input-action h1 {
+            margin: 0;
+            font-size: 1.2em;
+        }
     `;
-};
 
-const renderIntercept = (state) => {
-    let myTeam = state.game.players.find((p) => p.id === state.user_info.id).team;
+    parseGuess(guess) {
+        const { state } = this;
+        guess = guess.trim();
+        let parts = guess.split('-');
+        if (parts.length !== state.game.settings.clue_count) {
+            return null;
+        }
+        let result = [];
+        for (let i = 0; i < parts.length; i += 1) {
+            let num = parseInt(parts[i], 10);
+            if (isNaN(num) || num < 1 || num > state.game.settings.keyword_count) {
+                return null; // Invalid guess
+            }
+            result.push(num - 1); // Convert to zero-based index
+        }
+        if (new Set(result).size !== result.length) {
+            return null; // Duplicates in the guess
+        }
+        return result;
+    }
 
-    const onKeyPress = (e) => {
+    handleKeyPress(e) {
         if (e.key === 'Enter') {
-            let guess = parseGuess(state, e.target.value);
+            let guess = this.parseGuess(e.target.value);
             if (guess === null) {
                 e.target.setCustomValidity(e.target.title);
                 e.target.reportValidity();
             } else {
-                state.dispatchEvent(new CustomEvent('send-cmd', {
-                    detail: { submit_intercept: guess },
-                    bubbles: true,
-                    composed: true,
-                }));
+                this.state.send({ submit_intercept: guess });
             }
         }
-    };
-
-    return html`
-        <div class="input-action">
-            <h1>Attempt interception:</h1>
-            ${
-        state.game.current_round[+!myTeam].clues === null
-            ? html`<li>Encryptor ran out of time, nothing to intercept.</li>`
-            : state.game.current_round[+!myTeam].clues.map((clue) => html`<li>${semantic.clue(state, clue)}</li>`)
     }
-            <input
-                type="text"
-                placeholder="${
-        [...Array(state.game.settings.clue_count).keys().map((i) => i + 1)].join(
-            '-',
-        )
-    }"
-                required
-                title="Enter your guess as a sequence of numbers, separated by dashes (e.g. 1-2-3)"
-                .value=${state.intercept_input || ''}
-                @input=${(e) => state.intercept_input = e.target.value}
-                @keypress=${onKeyPress}
-            >
-        </div>
+
+    render() {
+        const myTeam = this.state.game.players.find((p) => p.id === this.state.user_info.id).team;
+        return html`
+            <div class="input-action">
+                <h1>Attempt interception:</h1>
+                ${
+            this.state.game.current_round[+!myTeam].clues === null
+                ? html`<li>Encryptor ran out of time, nothing to intercept.</li>`
+                : this.state.game.current_round[+!myTeam].clues.map((clue) => html`<li>${semantic.clue(this.state, clue)}</li>`)
+        }
+                <input
+                    type="text"
+                    placeholder="${
+            [...Array(this.state.game.settings.clue_count).keys().map((i) => i + 1)].join('-')
+        }"
+                    required
+                    title="Enter your guess as a sequence of numbers, separated by dashes (e.g. 1-2-3)"
+                    .value=${this.state.intercept_input || ''}
+                    @input=${(e) => this.state.intercept_input = e.target.value}
+                    @keypress=${this.handleKeyPress.bind(this)}
+                >
+            </div>
         `;
+    }
+}
+
+customElements.define('intercept-view', InterceptView);
+
+const renderDecipher = (state) => {
+    return html`<decipher-view .state=${state}></decipher-view>`;
+};
+
+const renderIntercept = (state) => {
+    return html`<intercept-view .state=${state}></intercept-view>`;
 };
 
 const inputActionCSS = css`
