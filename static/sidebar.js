@@ -3,7 +3,13 @@ import semantic from './semantic.js';
 
 const kickButton = (state, playerId) => {
     return html`
-        <button class="kick-button" @click=${() => state.send({ kick: playerId })}>
+        <button class="kick-button" @click=${() => {
+            state.dispatchEvent(new CustomEvent('send-cmd', {
+                detail: { kick: playerId },
+                bubbles: true,
+                composed: true,
+            }));
+        }}>
             Kick
         </button>
     `;
@@ -105,7 +111,11 @@ const renderGlobalChat = (state) => {
         if (e.key === 'Enter') {
             let text = state.global_chat_input.trim();
             if (text.length > 0) {
-                state.send({ global_chat: text });
+                state.dispatchEvent(new CustomEvent('send-cmd', {
+                    detail: { global_chat: text },
+                    bubbles: true,
+                    composed: true,
+                }));
                 state.global_chat_input = '';
                 e.target.value = ''; // Clear input field
             }

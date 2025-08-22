@@ -83,7 +83,11 @@ const submitClues = (state) => {
             console.error(`Clue input ${i} is empty, skipping`);
         }
     }
-    state.send({ submit_clues: data });
+    state.dispatchEvent(new CustomEvent('send-cmd', {
+        detail: { submit_clues: data },
+        bubbles: true,
+        composed: true,
+    }));
     state.clue_inputs = [];
 };
 
@@ -100,17 +104,20 @@ const renderHurryUp = (state, deadline) => {
     <input
         type="button"
         value="Hurry up!"
-        @click=${() =>
-        state.send({
-            frustrated: {
-                encrypting: ('waiting_for_encryptors' in state.game.inputs),
-                teams: (
-                    ('waiting_for_encryptors' in state.game.inputs)
-                        ? state.game.inputs.waiting_for_encryptors.teams
-                        : state.game.inputs.waiting_for_guessers.teams
-                ),
-            },
-        })}
+        @click=${() => {
+            state.dispatchEvent(new CustomEvent('send-cmd', {
+                detail: {
+                    encrypting: ('waiting_for_encryptors' in state.game.inputs),
+                    teams: (
+                        ('waiting_for_encryptors' in state.game.inputs)
+                            ? state.game.inputs.waiting_for_encryptors.teams
+                            : state.game.inputs.waiting_for_guessers.teams
+                    ),
+                },
+                bubbles: true,
+                composed: true,
+            }));
+        }}
     />
     `;
 };
@@ -157,7 +164,11 @@ const renderDecipher = (state) => {
                 e.target.setCustomValidity(e.target.title);
                 e.target.reportValidity();
             } else {
-                state.send({ submit_decipher: guess });
+                state.dispatchEvent(new CustomEvent('send-cmd', {
+                    detail: { submit_decipher: guess },
+                    bubbles: true,
+                    composed: true,
+                }));
             }
         }
     };
@@ -199,7 +210,11 @@ const renderIntercept = (state) => {
                 e.target.setCustomValidity(e.target.title);
                 e.target.reportValidity();
             } else {
-                state.send({ submit_intercept: guess });
+                state.dispatchEvent(new CustomEvent('send-cmd', {
+                    detail: { submit_intercept: guess },
+                    bubbles: true,
+                    composed: true,
+                }));
             }
         }
     };
@@ -252,7 +267,11 @@ const renderTiebreaker = (state, deadline) => {
                     if (e.key === 'Enter') {
                         let guess = e.target.value.trim();
                         if (guess.length > 0) {
-                            state.send({ submit_tiebreaker: { index: i, guess } });
+                            state.dispatchEvent(new CustomEvent('send-cmd', {
+                                detail: { submit_tiebreaker: { index: i, guess } },
+                                bubbles: true,
+                                composed: true,
+                            }));
                         }
                     }
                 }}

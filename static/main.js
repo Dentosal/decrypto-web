@@ -63,7 +63,11 @@ class AppRoot extends LitElement {
         this.ws = new WebSocket('/ws');
         this.ws.addEventListener('message', e => this.onMessage(e));
         this.ws.addEventListener('open', () => {
-            this.send({ auth: { secret: localStorage.getItem('secret') || null } });
+            this.dispatchEvent(new CustomEvent('send-cmd', {
+                detail: { auth: { secret: localStorage.getItem('secret') || null } },
+                bubbles: true,
+                composed: true,
+            }));
         });
         this.ws.addEventListener('error', (e) => {
             console.error('WebSocket error:', e);
@@ -77,6 +81,12 @@ class AppRoot extends LitElement {
             document.getElementById('error').classList.remove('severity-info');
             document.getElementById('error').classList.remove('severity-warning');
             document.getElementById('error').classList.add('severity-error');
+        });
+
+        this.addEventListener('send-cmd', e => {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return; // TODO: show error
+            console.log('send: ' + JSON.stringify(e.detail));
+            this.ws.send(JSON.stringify(e.detail));
         });
 
         document.getElementById('init-load').remove();
@@ -118,18 +128,16 @@ class AppRoot extends LitElement {
         }
     }
 
-    send(msg) {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return; // TODO: show error
-        console.log('send: ' + JSON.stringify(msg));
-        this.ws.send(JSON.stringify(msg));
-    }
-
     render() {
         if (!this.user_info?.nick || this.override_view === 'nick_required') {
             return html`${[
                 topbar(this), 
                 html`<nickname-input @set=${e => {
-                    this.send({ set_nick: e.detail });
+                    this.dispatchEvent(new CustomEvent('send-cmd', {
+                        detail: { set_nick: e.detail },
+                        bubbles: true,
+                        composed: true,
+                    }));
                     this.override_view = null;
                 }}></nickname-input>`
             ]}`;
@@ -140,7 +148,11 @@ class AppRoot extends LitElement {
             if (this.game && this.game.id !== gameId) {
                 return html`TODO: game stay or switch view`;
             }
-            this.send({ join_lobby: gameId });
+            this.dispatchEvent(new CustomEvent('send-cmd', {
+                detail: { join_lobby: gameId },
+                bubbles: true,
+                composed: true,
+            }));
             window.location.hash = '';
             return html`<p>Joining lobby...</p>`;
         }
@@ -165,7 +177,13 @@ class AppRoot extends LitElement {
                 To join a lobby, please use a link sent by the host.
                 </div>
                 <br>
-                <input type="button" @click=${() => this.send({ create_lobby: null })} id="create-lobby" value="Create lobby">
+                <input type="button" @click=${() => {
+                    this.dispatchEvent(new CustomEvent('send-cmd', {
+                        detail: { create_lobby: null },
+                        bubbles: true,
+                        composed: true,
+                    }));
+                }} id="create-lobby" value="Create lobby">
             </div>
         `;
     }
@@ -182,7 +200,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     secondsLeft = 0;
                     let inputs = state.game?.in_game?.inputs;
                     if (inputs !== null) {
-                        state.send({ trigger_timers: null });
+                        state.dispatchEvent(new CustomEvent('send-cmd', {
+                            detail: { trigger_timers: null },
+                            bubbles: true,
+                            composed: true,
+                        }));
                     }
                 }
                 el.querySelector('.seconds-left').innerText = secondsLeft;

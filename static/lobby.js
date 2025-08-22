@@ -3,7 +3,13 @@ import semantic from './semantic.js';
 
 const kickButton = (state, playerId) => {
     return html`
-        <button class="kick-button" @click=${() => state.send({ kick: playerId })}>
+        <button class="kick-button" @click=${() => {
+            state.dispatchEvent(new CustomEvent('send-cmd', {
+                detail: { kick: playerId },
+                bubbles: true,
+                composed: true,
+            }));
+        }}>
             Kick
         </button>
     `;
@@ -26,7 +32,13 @@ export default function viewLobby(state) {
             <input
                 type="button"
                 value="Leave lobby"
-                @click=${() => state.send({ leave_lobby: null })}
+                @click=${() => {
+                    state.dispatchEvent(new CustomEvent('send-cmd', {
+                        detail: { leave_lobby: null },
+                        bubbles: true,
+                        composed: true,
+                    }));
+                }}
             />
         </h1>
         <p>Invite link: <a id="invite-link" href="${window.location.origin}/#join_${state.game.id}">${window.location.origin}/#join_${state.game.id}</a></p>
@@ -36,7 +48,13 @@ export default function viewLobby(state) {
                 id="start-game"
                 value="Start game"
                 ?disabled=${state.game.reason_not_startable}
-                @click=${() => state.send({ start_game: null })}
+                @click=${() => {
+                    state.dispatchEvent(new CustomEvent('send-cmd', {
+                        detail: { start_game: null },
+                        bubbles: true,
+                        composed: true,
+                    }));
+                }}
             />
             ${state.game.reason_not_startable ? html`(${state.game.reason_not_startable})` : ''}
         </p>
@@ -53,7 +71,13 @@ export default function viewLobby(state) {
                         type="button"
                         value="Join"
                         id="join-team-1"
-                        @click=${() => state.send({ join_team: false })}
+                        @click=${() => {
+                            state.dispatchEvent(new CustomEvent('send-cmd', {
+                                detail: { join_team: false },
+                                bubbles: true,
+                                composed: true,
+                            }));
+                        }}
                     />
                 </h3>
                 ${
@@ -69,7 +93,13 @@ export default function viewLobby(state) {
                         type="button"
                         value="Join"
                         id="join-team-2"
-                        @click=${() => state.send({ join_team: true })}
+                        @click=${() => {
+                            state.dispatchEvent(new CustomEvent('send-cmd', {
+                                detail: { join_team: true },
+                                bubbles: true,
+                                composed: true,
+                            }));
+                        }}
                     />
                 </h3>
                 ${state.game.players.filter((p) => p.is_in_game && p.team === true).map((p) => renderPlayer(state, p))}
@@ -80,7 +110,11 @@ export default function viewLobby(state) {
         <select id="wordlist-select" @change=${(e) => {
         let settings = JSON.parse(JSON.stringify(state.game.settings));
         settings.wordlist = e.target.value;
-        state.send({ change_settings: settings });
+        state.dispatchEvent(new CustomEvent('send-cmd', {
+            detail: { change_settings: settings },
+            bubbles: true,
+            composed: true,
+        }));
     }}>
             ${
         state.wordlists.map((wl) =>
