@@ -1,163 +1,178 @@
-import { html, render } from 'https://unpkg.com/lit?module';
+import { html, LitElement } from 'https://unpkg.com/lit?module';
 import viewLobby from './lobby.js';
 import viewInGame from './in_game.js';
 import topbar from './topbar.js';
 import sidebar from './sidebar.js';
 import './components/nick.js';
 
-const state = {
-    version: null,
-    ws: null,
-    user_info: null,
-    game: null,
-    decipher_input: '',
-    intercept_input: '',
-    global_chat_input: '',
-    clue_input_draw: null,
-    clue_inputs: [],
-    tiebreaker_inputs: [],
-    override_view: null,
-    error: null,
-    error_expires: null,
-    wordlists: null,
-};
+class AppRoot extends LitElement {
+    static properties = {
+        ws: { type: Object },
+        user_info: { type: Object },
+        game: { type: Object },
+        decipher_input: { type: String },
+        intercept_input: { type: String },
+        global_chat_input: { type: String },
+        clue_input_draw: { type: Object },
+        clue_inputs: { type: Array },
+        tiebreaker_inputs: { type: Array },
+        override_view: { type: String },
+        version: { type: Object },
+        wordlists: { type: Array },
+        error: { type: Object },
+        error_expires: { type: Number },
+    };
 
-const connect = () => {
-    state.ws = new WebSocket('/ws');
-    state.ws.addEventListener('message', onMessage);
-    state.ws.addEventListener('open', () => {
-        console.log('WebSocket connection established');
-        send({ auth: { secret: localStorage.getItem('secret') || null } });
-    });
-    state.ws.addEventListener('error', (e) => {
-        console.error('WebSocket error:', e);
-        document.getElementById('error').innerText = e.message;
-        document.getElementById('error').classList.remove('severity-info');
-        document.getElementById('error').classList.remove('severity-warning');
-        document.getElementById('error').classList.add('severity-error');
-    });
-    state.ws.addEventListener('close', (e) => {
-        document.getElementById('error').innerText = 'Server closed connection unexpectedly ' + e.reason;
-        document.getElementById('error').classList.remove('severity-info');
-        document.getElementById('error').classList.remove('severity-warning');
-        document.getElementById('error').classList.add('severity-error');
-    });
-};
 
-const onMessage = (event) => {
-    const msg = JSON.parse(event.data);
-    console.log('recv: ' + JSON.stringify(msg));
-    if (msg.state) {
-        state.user_info = msg.state.user_info;
-        state.game = msg.state.game;
-        localStorage.setItem('secret', state.user_info.secret);
-        update();
+    constructor() {
+        super();
+
+        this.ws = null;
+        this.user_info = null;
+        this.game = null;
+        this.decipher_input = '';
+        this.intercept_input = '';
+        this.global_chat_input = '';
+        this.clue_input_draw = null;
+        this.clue_inputs = [];
+        this.tiebreaker_inputs = [];
+        this.override_view = null;
+        this.version = null;
+        this.wordlists = [];
+        this.error = null;
+        this.error_expires = null;
     }
-    if (msg.error) {
-        // TODO: proper toast system, and different handling for hard errors
-        let id = Math.random().toString(36);
-        state.error = msg.error;
-        state.error.id = id;
-        document.getElementById('error').innerText = state.error.message;
-        document.getElementById('error').classList.remove('severity-info');
-        document.getElementById('error').classList.remove('severity-warning');
-        document.getElementById('error').classList.remove('severity-error');
-        document.getElementById('error').classList.add(
-            'severity-' + state.error.severity,
-        );
-        setTimeout(() => {
-            if (state.error.id !== id) return; // ignore if error has changed
-            state.error = null;
-            document.getElementById('error').innerText = '';
+
+    createRenderRoot() {
+        return this; // Disable shadow DOM for the root element
+    }
+
+    async connectedCallback() {
+        super.connectedCallback();
+
+        // HACK: for debugging, expose the inner state
+        window.state = this;
+
+        document.getElementById('init-load').innnerText = 'Initializing...';
+
+        this.version = await((await fetch('/version')).json());
+        this.wordlists = await((await fetch('/wordlists')).json());
+
+        document.getElementById('init-load').innnerText = 'Connecting...';
+
+        this.ws = new WebSocket('/ws');
+        this.ws.addEventListener('message', e => this.onMessage(e));
+        this.ws.addEventListener('open', () => {
+            this.send({ auth: { secret: localStorage.getItem('secret') || null } });
+        });
+        this.ws.addEventListener('error', (e) => {
+            console.error('WebSocket error:', e);
+            document.getElementById('error').innerText = e.message;
+            document.getElementById('error').classList.remove('severity-info');
+            document.getElementById('error').classList.remove('severity-warning');
+            document.getElementById('error').classList.add('severity-error');
+        });
+        this.ws.addEventListener('close', (e) => {
+            document.getElementById('error').innerText = 'Server closed connection unexpectedly ' + e.reason;
+            document.getElementById('error').classList.remove('severity-info');
+            document.getElementById('error').classList.remove('severity-warning');
+            document.getElementById('error').classList.add('severity-error');
+        });
+
+        document.getElementById('init-load').remove();
+    }
+
+    onMessage(event) {
+        const msg = JSON.parse(event.data);
+        console.log('recv: ' + JSON.stringify(msg));
+        if (msg.state) {
+            this.user_info = msg.state.user_info;
+            this.game = msg.state.game;
+            localStorage.setItem('secret', this.user_info.secret);
+            // HACK: scroll to bottom of chat messages
+            // TODO: do this properly
+            for (const el of document.querySelectorAll('.messages')) {
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+        if (msg.error) {
+            // TODO: proper toast system, and different handling for hard errors
+            let id = Math.random().toString(36);
+            this.error = msg.error;
+            this.error.id = id;
+            document.getElementById('error').innerText = this.error.message;
             document.getElementById('error').classList.remove('severity-info');
             document.getElementById('error').classList.remove('severity-warning');
             document.getElementById('error').classList.remove('severity-error');
-        }, 5000);
-    }
-};
-
-const send = (msg) => {
-    if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return; // TODO: show error
-    console.log('send: ' + JSON.stringify(msg));
-    state.ws.send(JSON.stringify(msg));
-};
-
-const createLobby = () => {
-    send({ create_lobby: null });
-};
-
-const viewNotInLobby = () => {
-    return html`
-    <div id="welcome">
-        <div>
-        To join a lobby, please use a link sent by the host.
-        </div>
-        <br>
-        <input type="button" @click=${createLobby} id="create-lobby" value="Create lobby">
-    </div>
-    `;
-};
-
-const currentView = () => {
-    if (!state.user_info?.nick || state.override_view === 'nick_required') {
-        return html`${[
-            topbar(state), 
-            html`<nickname-input @set=${e => {
-                send({ set_nick: e.detail });
-                state.override_view = null;
-            }}></nickname-input>`
-        ]}`;
-    }
-
-    if (window.location.hash.startsWith('#join_')) {
-        const gameId = window.location.hash.slice(6);
-        if (state.game && state.game.id !== gameId) {
-            return html`TODO: game stay or switch view`;
+            document.getElementById('error').classList.add(
+                'severity-' + this.error.severity,
+            );
+            setTimeout(() => {
+                if (this.error.id !== id) return; // ignore if error has changed
+                this.error = null;
+                document.getElementById('error').innerText = '';
+                document.getElementById('error').classList.remove('severity-info');
+                document.getElementById('error').classList.remove('severity-warning');
+                document.getElementById('error').classList.remove('severity-error');
+            }, 5000);
         }
-        send({ join_lobby: gameId });
-        window.location.hash = '';
-        return html`<p>Joining lobby...</p>`;
     }
 
-    if (state.game) {
-        let view;
-        if (state.game.state === 'lobby') {
-            view = viewLobby;
-        } else {
-            view = viewInGame;
+    send(msg) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return; // TODO: show error
+        console.log('send: ' + JSON.stringify(msg));
+        this.ws.send(JSON.stringify(msg));
+    }
+
+    render() {
+        if (!this.user_info?.nick || this.override_view === 'nick_required') {
+            return html`${[
+                topbar(this), 
+                html`<nickname-input @set=${e => {
+                    this.send({ set_nick: e.detail });
+                    this.override_view = null;
+                }}></nickname-input>`
+            ]}`;
         }
-        return html`${topbar(state)}<div class="sidebar-split">${[
-            view(state),
-            sidebar(state),
-        ]}</div>`;
+        
+        if (window.location.hash.startsWith('#join_')) {
+            const gameId = window.location.hash.slice(6);
+            if (this.game && this.game.id !== gameId) {
+                return html`TODO: game stay or switch view`;
+            }
+            this.send({ join_lobby: gameId });
+            window.location.hash = '';
+            return html`<p>Joining lobby...</p>`;
+        }
+        
+        if (this.game) {
+            let view;
+            if (this.game.state === 'lobby') {
+                view = viewLobby;
+            } else {
+                view = viewInGame;
+            }
+            return html`${topbar(this)}<div class="sidebar-split">${[
+                view(this),
+                sidebar(this),
+            ]}</div>`;
+        }
+
+        return html`
+            ${topbar(this)}
+            <div id="welcome">
+                <div>
+                To join a lobby, please use a link sent by the host.
+                </div>
+                <br>
+                <input type="button" @click=${() => this.send({ create_lobby: null })} id="create-lobby" value="Create lobby">
+            </div>
+        `;
     }
-
-    return html`${[topbar(state), viewNotInLobby(state)]}`;
-};
-
-const update = () => {
-    render(currentView(), document.getElementById('app'));
-    // Auto-scroll to bottom of messages
-    // TODO: only do this if new messages were added
-    for (const el of document.querySelectorAll('.messages')) {
-        el.scrollTop = el.scrollHeight;
-    }
-};
-
-// Methods accessible from the child modules
-state.update = update;
-state.send = send;
+}
+customElements.define('app-root', AppRoot);
 
 document.addEventListener('DOMContentLoaded', async () => {
-    document.getElementById('init-load').innnerText = 'Initializing...';
-    state.version = await ((await fetch('/version')).json());
-    state.wordlists = await ((await fetch('/wordlists')).json());
-
-    document.getElementById('init-load').innnerText = 'Connecting...';
-    connect();
-    document.getElementById('init-load').remove();
-    update();
-
     setInterval((_) => {
         document.querySelectorAll('[x-deadline]').forEach((el) => {
             let deadline = el.getAttribute('x-deadline');
@@ -181,6 +196,3 @@ window.onhashchange = () => {
         window.location.reload();
     }
 };
-
-// debug helper, remove this later?
-window.state = state;

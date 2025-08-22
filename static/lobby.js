@@ -18,7 +18,7 @@ const renderPlayer = (state, player) => {
     `;
 };
 
-export default function viewInGame(state) {
+export default function viewLobby(state) {
     return html`
     <div id="lobby">
         <h1>
