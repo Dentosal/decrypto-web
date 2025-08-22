@@ -19,6 +19,7 @@ class WaitingFor extends LitElement {
             <h1><slot></slot></h1>
             <hurry-up-button .state=${this.state} .deadline=${this.deadline}></hurry-up-button>
         </div>
+        <deadline-display .deadline=${this.deadline}></deadline-display>
         `;
     }
 }

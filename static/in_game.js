@@ -1,6 +1,8 @@
 import { html } from 'https://unpkg.com/lit?module';
 import semantic from './semantic.js';
 import './components/paint.js';
+import './input_action/hurry_up.js';
+import './input_action/deadline.js';
 import './input_action/give_clues.js';
 import './input_action/decipher.js';
 import './input_action/intercept.js';
@@ -33,7 +35,11 @@ const renderAction = (state) => {
     }
 
     if ('encrypt' in state.game.inputs) {
-        return html`<clue-giver-view .state=${state}></clue-giver-view>`;
+        let deadline = state.game.inputs.encrypt.deadline;
+        return html`
+            <clue-giver-view .state=${state}></clue-giver-view>
+            <deadline-display .deadline=${deadline}></deadline-display>
+        `;
     } else if ('guess' in state.game.inputs) {
         let intercept = state.game.inputs.guess.intercept;
         let decipher = state.game.inputs.guess.decipher;
