@@ -50,8 +50,6 @@ class AppRoot extends LitElement {
         // HACK: for debugging, expose the inner state
         window.state = this;
 
-        this.addEventListener('send-cmd', e => this.send(e.detail));
-
         document.getElementById('init-load').innnerText = 'Initializing...';
 
         this.version = await((await fetch('/version')).json());
