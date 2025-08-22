@@ -13,7 +13,6 @@ const devReloadCSS = () => {
 const resetNick = (state) => {
     state.nickname_input = '';
     state.override_view = 'nick_required';
-    state.update();
 };
 
 export default function topbar(state) {

@@ -16,7 +16,11 @@ class NicknameInput extends LitElement {
 
     handleKeyPress(e) {
         if (e.key === 'Enter') {
-            this.dispatchEvent(new CustomEvent('set', { detail: this.value }));
+            this.dispatchEvent(new CustomEvent('set', {
+                detail: this.value,
+                bubbles: true,
+                composed: true,
+            }));
         }
     }
 
