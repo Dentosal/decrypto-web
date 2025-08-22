@@ -5,6 +5,13 @@ import topbar from './topbar.js';
 import sidebar from './sidebar.js';
 import './components/nick.js';
 import './components/paint.js';
+import './components/hurry_up.js';
+import './components/deadline.js';
+import './components/give_clues.js';
+import './components/decipher.js';
+import './components/intercept.js';
+import './components/tiebreaker.js';
+import './components/waiting_for.js';
 
 class AppRoot extends LitElement {
     static properties = {

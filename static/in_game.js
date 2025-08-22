@@ -1,13 +1,5 @@
 import { html } from 'https://unpkg.com/lit?module';
 import semantic from './semantic.js';
-import './components/paint.js';
-import './input_action/hurry_up.js';
-import './input_action/deadline.js';
-import './input_action/give_clues.js';
-import './input_action/decipher.js';
-import './input_action/intercept.js';
-import './input_action/tiebreaker.js';
-import './input_action/waiting_for.js';
 
 
 const renderKeywords = (state) => {
