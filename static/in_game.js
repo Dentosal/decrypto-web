@@ -5,6 +5,7 @@ import './input_action/give_clues.js';
 import './input_action/decipher.js';
 import './input_action/intercept.js';
 import './input_action/tiebreaker.js';
+import './input_action/waiting_for.js';
 
 
 const renderKeywords = (state) => {
@@ -42,42 +43,24 @@ const renderAction = (state) => {
             intercept ? html`<intercept-view .state=${state}></intercept-view>` : null,
             deadline ? html`<deadline-display .deadline=${deadline}></deadline-display>` : null,
         ]}`;
-    } else if ('waiting_for_encryptors' in state.game.inputs) {
-        let waitingFor = state.game.inputs.waiting_for_encryptors.teams;
-        let deadline = state.game.inputs.waiting_for_encryptors.deadline;
-        let ourEncryptor = state.game.current_round[+myTeam].encryptor;
-        let theirEncryptor = state.game.current_round[+!myTeam].encryptor;
-        if (waitingFor[+myTeam] && waitingFor[+!myTeam]) {
-            return html`
-            <div class="input-action"><h1>
-                Waiting for both teams to finish encrypting
-                (${semantic.player(state, ourEncryptor)}, ${semantic.player(state, theirEncryptor)})...
-            </h1><hurry-up-button .state=${state} .deadline=${deadline}></hurry-up-button></div>`;
-        } else if (waitingFor[+myTeam]) {
-            return html`<div class="input-action"><h1>
-                Waiting for your team to finish encrypting
-                (${semantic.player(state, ourEncryptor)})...
-            </h1><hurry-up-button .state=${state} .deadline=${deadline}></hurry-up-button></div>`;
-        } else {
-            return html`<div class="input-action"><h1>
-                Waiting for the other team to finish encrypting
-                (${semantic.player(state, theirEncryptor)})...
-            </h1><hurry-up-button .state=${state} .deadline=${deadline}></hurry-up-button></div>`;
-        }
-    } else if ('waiting_for_guessers' in state.game.inputs) {
-        let waitingFor = state.game.inputs.waiting_for_guessers.teams;
-        let deadline = state.game.inputs.waiting_for_guessers.deadline;
+    } else if ('waiting_for_encryptors' in state.game.inputs || 'waiting_for_guessers' in state.game.inputs) {
+        let waitingFor = state.game.inputs.waiting_for_encryptors?.teams || state.game.inputs.waiting_for_guessers?.teams;
+        let deadline = state.game.inputs.waiting_for_encryptors?.deadline || state.game.inputs.waiting_for_guessers?.deadline;
         let waitText;
         if (waitingFor[+myTeam] && waitingFor[+!myTeam]) {
-            waitText = 'Waiting for both teams to finish guessing...';
+            waitText = state.game.inputs.waiting_for_encryptors
+                ? 'Waiting for both teams to finish encrypting...'
+                : 'Waiting for both teams to finish guessing...';
         } else if (waitingFor[+myTeam]) {
-            waitText = 'Waiting for your team to finish guessing...';
+            waitText = state.game.inputs.waiting_for_encryptors
+                ? 'Waiting for your team to finish encrypting...'
+                : 'Waiting for your team to finish guessing...';
         } else {
-            waitText = 'Waiting for the other team to finish guessing...';
+            waitText = state.game.inputs.waiting_for_encryptors
+                ? 'Waiting for the other team to finish encrypting...'
+                : 'Waiting for the other team to finish guessing...';
         }
-        return html`<div class="input-action"><h1>${waitText}</h1>
-            <hurry-up-button .state=${state} .deadline=${deadline}></hurry-up-button>
-        </div>`;
+        return html`<waiting-for .state=${state} .deadline=${deadline}>${waitText}</waiting-for>`;
     } else if ('tiebreaker' in state.game.inputs) {
         let deadline = state.game.inputs.tiebreaker.deadline;
         return html`

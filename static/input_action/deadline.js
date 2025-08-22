@@ -64,3 +64,20 @@ class DeadlineDisplay extends LitElement {
 }
 
 customElements.define('deadline-display', DeadlineDisplay);
+
+// setInterval((_) => {
+//     document.querySelectorAll('[x-deadline]').forEach((el) => {
+//         let deadline = el.getAttribute('x-deadline');
+//         if (deadline) {
+//             let secondsLeft = Math.floor((parseInt(deadline) - Date.now()) / 1000);
+//             if (secondsLeft < 0) {
+//                 secondsLeft = 0;
+//                 let inputs = state.game?.in_game?.inputs;
+//                 if (inputs !== null) {
+//                     state.send({ trigger_timers: null });
+//                 }
+//             }
+//             el.querySelector('.seconds-left').innerText = secondsLeft;
+//         }
+//     });
+// }, 1000);

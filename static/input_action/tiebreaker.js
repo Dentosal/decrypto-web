@@ -147,7 +147,6 @@ class TiebreakerView extends LitElement {
                     <div class="input-action">
                         <h1>${waitText}</h1>
                         <hurry-up-button .state=${this.state}></hurry-up-button>
-                        <deadline-display .deadline=${this.deadline}></deadline-display>
                     </div>
                 `
                 : ''

@@ -182,29 +182,6 @@ class AppRoot extends LitElement {
 }
 customElements.define('app-root', AppRoot);
 
-document.addEventListener('DOMContentLoaded', async () => {
-    setInterval((_) => {
-        document.querySelectorAll('[x-deadline]').forEach((el) => {
-            let deadline = el.getAttribute('x-deadline');
-            if (deadline) {
-                let secondsLeft = Math.floor((parseInt(deadline) - Date.now()) / 1000);
-                if (secondsLeft < 0) {
-                    secondsLeft = 0;
-                    let inputs = state.game?.in_game?.inputs;
-                    if (inputs !== null) {
-                        state.dispatchEvent(new CustomEvent('send-cmd', {
-                            detail: { trigger_timers: null },
-                            bubbles: true,
-                            composed: true,
-                        }));
-                    }
-                }
-                el.querySelector('.seconds-left').innerText = secondsLeft;
-            }
-        });
-    }, 1000);
-});
-
 window.onhashchange = () => {
     if (window.location.hash.startsWith('#join_')) {
         window.location.reload();
