@@ -109,7 +109,7 @@ def extract_round_index(driver) -> Optional[int]:
         return None
 
 
-def do_input_clue_giver(root):
+def do_input_clue_giver(root, _index, _round_index, _strategy):
     time.sleep(0.3)
     for row in root.find_elements(By.CSS_SELECTOR, "tr"):
         clue_for = row.find_element(By.CSS_SELECTOR, "td:nth-child(1)").get_attribute(
@@ -194,81 +194,44 @@ def do_input_tiebreaker(root, index, round_index, strategy):
                 textbox.clear()
 
 
-def do_input_actions(driver, index, strategy) -> Optional[str]:
+def do_input_actions(driver, index, strategy):
     round_index = extract_round_index(driver)
     if round_index is None:
-        return None
+        return
 
     try:
-        try:
-            view = driver.find_element(By.CSS_SELECTOR, "clue-giver-view").shadow_root
-        except NoSuchElementException:
-            view = None
-        except NoSuchShadowRootException:
-            view = None
-        if view is not None:
-            do_input_clue_giver(view)
-
-        try:
-            view = driver.find_element(By.CSS_SELECTOR, "decipher-view").shadow_root
-        except NoSuchElementException:
-            view = None
-        except NoSuchShadowRootException:
-            view = None
-        if view is not None:
-            do_input_decipher(view, index, round_index, strategy)
-
-        try:
-            view = driver.find_element(By.CSS_SELECTOR, "intercept-view").shadow_root
-        except NoSuchElementException:
-            view = None
-        except NoSuchShadowRootException:
-            view = None
-        if view is not None:
-            do_input_intercept(view, index, round_index, strategy)
-
-        try:
-            view = driver.find_element(By.CSS_SELECTOR, "tiebreaker-view").shadow_root
-        except NoSuchElementException:
-            view = None
-        except NoSuchShadowRootException:
-            view = None
-        if view is not None:
-            do_input_tiebreaker(view, index, round_index, strategy)
-    except StaleElementReferenceException:
-        return None
-    except DetachedShadowRootException:
-        return None
-
-    try:
-        for ia in driver.find_elements(By.CSS_SELECTOR, "div.input-action"):
+        for elem, handler in [
+            ("clue-giver-view", do_input_clue_giver),
+            ("decipher-view", do_input_decipher),
+            ("intercept-view", do_input_intercept),
+            ("tiebreaker-view", do_input_tiebreaker),
+        ]:
             try:
-                h1 = ia.find_element(By.CSS_SELECTOR, "h1").get_attribute("innerText")
+                view = driver.find_element(By.CSS_SELECTOR, elem).shadow_root
             except NoSuchElementException:
-                continue
-            if "It's your turn to give clues!" in h1:
-                pass
-            elif "decipher your clues" in h1:
-                pass
-            elif "Attempt interception" in h1:
-                pass
-            elif "Waiting for" in h1:
-                pass
-            elif "Tiebreaker" in h1:
-                pass
-            elif "Game Over" in h1:
-                if "win" in h1 or "won" in h1:
-                    return "win"
-                elif "lose" in h1 or "lost" in h1:
-                    return "loss"
-                elif "draw" in h1:
-                    return "draw"
-                else:
-                    raise ValueError(f"Unexpected game result: {h1}")
-            else:
-                raise ValueError(f"Unexpected input action: {h1}")
+                view = None
+            except NoSuchShadowRootException:
+                view = None
+            if view is not None:
+                handler(view, index, round_index, strategy)
     except StaleElementReferenceException:
-        return None
+        pass
+    except DetachedShadowRootException:
+        pass
+
+
+def get_game_result(driver) -> Optional[str]:
+    for h1 in driver.find_elements(By.CSS_SELECTOR, "h1"):
+        h1 = h1.get_attribute("innerText")
+        if "Game Over" in h1:
+            if "win" in h1 or "won" in h1:
+                return "win"
+            elif "lose" in h1 or "lost" in h1:
+                return "loss"
+            elif "draw" in h1:
+                return "draw"
+            else:
+                raise ValueError(f"Unexpected game result: {h1}")
     return None
 
 
@@ -328,7 +291,9 @@ def simple_player(
             if index == 0:
                 start_game_if_possible(driver)
 
-            if game_result := do_input_actions(driver, index, strategy):
+            do_input_actions(driver, index, strategy)
+
+            if game_result := get_game_result(driver):
                 shared.results[index] = game_result
                 return
             time.sleep(0.5)
