@@ -18,6 +18,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import (
     NoSuchElementException,
     StaleElementReferenceException,
+    DetachedShadowRootException,
+    NoSuchShadowRootException,
 )
 
 
@@ -99,9 +101,9 @@ def start_game_if_possible(driver):
         pass
 
 
-def do_input_actions(driver, index, strategy) -> Optional[str]:
+def extract_round_index(driver) -> Optional[int]:
     try:
-        round_index = (
+        return (
             int(
                 driver.find_element(
                     By.CSS_SELECTOR, ".history tr:last-child td:first-child"
@@ -112,94 +114,130 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
     except NoSuchElementException:
         return None
 
-    try:
-        for ia in driver.find_elements(By.CSS_SELECTOR, "div.input-action"):
 
-            try:
-                h1 = ia.find_element(By.CSS_SELECTOR, "h1").get_attribute("innerText")
-            except NoSuchElementException:
-                continue
-            if "It's your turn to give clues!" in h1:
-                # Give clues
-                time.sleep(0.3)
-                for row in ia.find_elements(By.CSS_SELECTOR, "tr"):
-                    clue_for = row.find_element(
-                        By.CSS_SELECTOR, "td:nth-child(1)"
-                    ).get_attribute("innerText")
-                    clue_input = row.find_element(
-                        By.CSS_SELECTOR, "td:nth-child(3) input[type=text]"
-                    )
-                    if clue_input.get_attribute("value") == "":
-                        clue_input.send_keys("kw=" + clue_for[:-1])
-                time.sleep(0.5)
-                submit = ia.find_element(By.CSS_SELECTOR, "#submit-clues")
-                if not submit.get_attribute("disabled"):
-                    submit.click()
+def do_input_clue_giver(root, _index, _round_index, _strategy):
+    time.sleep(0.3)
+    for row in root.find_elements(By.CSS_SELECTOR, "tr"):
+        clue_for = row.find_element(By.CSS_SELECTOR, "td:nth-child(1)").get_attribute(
+            "innerText"
+        )
+        clue_input = row.find_element(
+            By.CSS_SELECTOR, "td:nth-child(3) input[type=text]"
+        )
+        if clue_input.get_attribute("value") == "":
+            clue_input.send_keys("kw=" + clue_for[:-1])
+    time.sleep(0.5)
+    submit = root.find_element(By.CSS_SELECTOR, "#submit-clues")
+    if not submit.get_attribute("disabled"):
+        submit.click()
+    time.sleep(0.1)
+
+
+def do_input_decipher(root, index, round_index, strategy):
+    correct = "-".join(
+        ct.get_attribute("innerText").split("=")[1]
+        for ct in root.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
+    )
+    use_correct = strategy(
+        StrategyInput(
+            player_index=index,
+            team=bool(index % 2),
+            round_index=round_index,
+            situation="guess",
+        )
+    )
+    assert correct, "No clues found for decipher"
+    value = correct if use_correct else correct[::-1]
+    textbox = root.find_element(By.CSS_SELECTOR, "input[type=text]")
+    if textbox.get_attribute("value") == "":
+        textbox.send_keys(value)
+        textbox.send_keys(Keys.ENTER)
+        time.sleep(0.1)
+    elif textbox.get_attribute("value") == value:
+        textbox.send_keys(Keys.ENTER)
+    else:
+        textbox.clear()
+
+
+def do_input_intercept(root, index, round_index, strategy):
+    correct = "-".join(
+        ct.get_attribute("innerText").split("=")[1]
+        for ct in root.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
+    )
+    assert correct, "No clues found for intercept"
+    use_correct = strategy(
+        StrategyInput(
+            player_index=index,
+            team=bool(index % 2),
+            round_index=round_index,
+            situation="intercept",
+        )
+    )
+    value = correct if use_correct else correct[::-1]
+    textbox = root.find_element(By.CSS_SELECTOR, "input[type=text]")
+    if textbox.get_attribute("value") == "":
+        textbox.send_keys(value)
+        textbox.send_keys(Keys.ENTER)
+        time.sleep(0.1)
+    elif textbox.get_attribute("value") == value:
+        textbox.send_keys(Keys.ENTER)
+    else:
+        textbox.clear()
+
+
+def do_input_tiebreaker(root, index, round_index, strategy):
+    for inp in root.find_elements(By.CSS_SELECTOR, "tiebreaker-input"):
+        for textbox in inp.shadow_root.find_elements(
+            By.CSS_SELECTOR, "input[type=text]"
+        ):
+            if textbox.get_attribute("value") == "":
+                textbox.send_keys("I guess, nope")
+                textbox.send_keys(Keys.ENTER)
                 time.sleep(0.1)
-            elif "decipher your clues" in h1:
-                correct = "-".join(
-                    ct.get_attribute("innerText").split("=")[1]
-                    for ct in ia.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
-                )
-                use_correct = strategy(
-                    StrategyInput(
-                        player_index=index,
-                        team=bool(index % 2),
-                        round_index=round_index,
-                        situation="guess",
-                    )
-                )
-                textbox = ia.find_element(By.CSS_SELECTOR, "input[type=text]")
-                if textbox.get_attribute("value") == "":
-                    textbox.send_keys(correct if use_correct else correct[::-1])
-                    textbox.send_keys(Keys.ENTER)
-                    time.sleep(0.1)
-                else:
-                    textbox.clear()
-            elif "Attempt interception" in h1:
-                correct = "-".join(
-                    ct.get_attribute("innerText").split("=")[1]
-                    for ct in ia.find_elements(By.CSS_SELECTOR, ".semantic-clue-text")
-                )
-                use_correct = strategy(
-                    StrategyInput(
-                        player_index=index,
-                        team=bool(index % 2),
-                        round_index=round_index,
-                        situation="intercept",
-                    )
-                )
-                textbox = ia.find_element(By.CSS_SELECTOR, "input[type=text]")
-                if textbox.get_attribute("value") == "":
-                    textbox.send_keys(correct if use_correct else correct[::-1])
-                    textbox.send_keys(Keys.ENTER)
-                    time.sleep(0.1)
-                else:
-                    textbox.clear()
-            elif "Waiting for" in h1:
+            elif textbox.get_attribute("value") == "I guess, nope":
                 pass
-            elif "Tiebreaker" in h1:
-                for textbox in ia.find_elements(By.CSS_SELECTOR, "input[type=text]"):
-                    if textbox.get_attribute("value") == "":
-                        textbox.send_keys("I guess, nope")
-                        textbox.send_keys(Keys.ENTER)
-                        time.sleep(0.1)
-                        break
-                    else:
-                        textbox.clear()
-            elif "Game Over" in h1:
-                if "win" in h1 or "won" in h1:
-                    return "win"
-                elif "lose" in h1 or "lost" in h1:
-                    return "loss"
-                elif "draw" in h1:
-                    return "draw"
-                else:
-                    raise ValueError(f"Unexpected game result: {h1}")
             else:
-                raise ValueError(f"Unexpected input action: {h1}")
+                textbox.clear()
+
+
+def do_input_actions(driver, index, strategy):
+    round_index = extract_round_index(driver)
+    if round_index is None:
+        return
+
+    try:
+        for elem, handler in [
+            ("clue-giver-view", do_input_clue_giver),
+            ("decipher-view", do_input_decipher),
+            ("intercept-view", do_input_intercept),
+            ("tiebreaker-view", do_input_tiebreaker),
+        ]:
+            try:
+                view = driver.find_element(By.CSS_SELECTOR, elem).shadow_root
+            except NoSuchElementException:
+                view = None
+            except NoSuchShadowRootException:
+                view = None
+            if view is not None:
+                handler(view, index, round_index, strategy)
     except StaleElementReferenceException:
-        return None
+        pass
+    except DetachedShadowRootException:
+        pass
+
+
+def get_game_result(driver) -> Optional[str]:
+    for h1 in driver.find_elements(By.CSS_SELECTOR, "h1"):
+        h1 = h1.get_attribute("innerText")
+        if "Game Over" in h1:
+            if "win" in h1 or "won" in h1:
+                return "win"
+            elif "lose" in h1 or "lost" in h1:
+                return "loss"
+            elif "draw" in h1:
+                return "draw"
+            else:
+                raise ValueError(f"Unexpected game result: {h1}")
     return None
 
 
@@ -259,7 +297,9 @@ def simple_player(
             if index == 0:
                 start_game_if_possible(driver)
 
-            if game_result := do_input_actions(driver, index, strategy):
+            do_input_actions(driver, index, strategy)
+
+            if game_result := get_game_result(driver):
                 shared.results[index] = game_result
                 return
             time.sleep(0.5)

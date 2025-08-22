@@ -5,18 +5,20 @@ import topbar from './topbar.js';
 import sidebar from './sidebar.js';
 import './components/nick.js';
 import './components/paint.js';
+import './components/hurry_up.js';
+import './components/deadline.js';
+import './components/give_clues.js';
+import './components/decipher.js';
+import './components/intercept.js';
+import './components/tiebreaker.js';
+import './components/waiting_for.js';
 
 class AppRoot extends LitElement {
     static properties = {
         ws: { type: Object },
-        user_info: { type: Object },
         game: { type: Object },
-        decipher_input: { type: String },
-        intercept_input: { type: String },
+        user_info: { type: Object },
         global_chat_input: { type: String },
-        clue_input_draw: { type: Object },
-        clue_inputs: { type: Array },
-        tiebreaker_inputs: { type: Array },
         override_view: { type: String },
         version: { type: Object },
         wordlists: { type: Array },
@@ -24,19 +26,13 @@ class AppRoot extends LitElement {
         error_expires: { type: Number },
     };
 
-
     constructor() {
         super();
 
         this.ws = null;
         this.user_info = null;
         this.game = null;
-        this.decipher_input = '';
-        this.intercept_input = '';
         this.global_chat_input = '';
-        this.clue_input_draw = null;
-        this.clue_inputs = [];
-        this.tiebreaker_inputs = [];
         this.override_view = null;
         this.version = null;
         this.wordlists = [];
@@ -99,6 +95,8 @@ class AppRoot extends LitElement {
         if (msg.state) {
             this.user_info = msg.state.user_info;
             this.game = msg.state.game;
+            this.requestUpdate();
+
             localStorage.setItem('secret', this.user_info.secret);
             // HACK: scroll to bottom of chat messages
             // TODO: do this properly
@@ -190,29 +188,6 @@ class AppRoot extends LitElement {
     }
 }
 customElements.define('app-root', AppRoot);
-
-document.addEventListener('DOMContentLoaded', async () => {
-    setInterval((_) => {
-        document.querySelectorAll('[x-deadline]').forEach((el) => {
-            let deadline = el.getAttribute('x-deadline');
-            if (deadline) {
-                let secondsLeft = Math.floor((parseInt(deadline) - Date.now()) / 1000);
-                if (secondsLeft < 0) {
-                    secondsLeft = 0;
-                    let inputs = state.game?.in_game?.inputs;
-                    if (inputs !== null) {
-                        state.dispatchEvent(new CustomEvent('send-cmd', {
-                            detail: { trigger_timers: null },
-                            bubbles: true,
-                            composed: true,
-                        }));
-                    }
-                }
-                el.querySelector('.seconds-left').innerText = secondsLeft;
-            }
-        });
-    }, 1000);
-});
 
 window.onhashchange = () => {
     if (window.location.hash.startsWith('#join_')) {
