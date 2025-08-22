@@ -12,12 +12,10 @@ class TiebreakerInput extends LitElement {
     constructor() {
         super();
         this.value = '';
-        this.submitted = null;
     }
 
     static get styles() {
         return [
-            inputActionCSS,
             css`
             .row {
                 display: flex;
@@ -28,23 +26,12 @@ class TiebreakerInput extends LitElement {
         ];
     }
 
-    handleInput(e) {
-        this.value = e.target.value;
-        this.dispatchEvent(new CustomEvent('tiebreaker-input', {
-            detail: { index: this.index, value: this.value },
-            bubbles: true,
-            composed: true,
-        }));
-    }
-
     handleKeyPress(e) {
         if (e.key === 'Enter') {
             let guess = e.target.value.trim();
             if (guess.length > 0) {
-                this.dispatchEvent(new CustomEvent('submit-tiebreaker', {
+                this.dispatchEvent(new CustomEvent('submit', {
                     detail: { index: this.index, guess },
-                    bubbles: true,
-                    composed: true,
                 }));
             }
         }
@@ -63,12 +50,14 @@ class TiebreakerInput extends LitElement {
         }
         return html`
         <div class="row">
-            <td>${this.index + 1}.</td>
+            <td>${this.index + 1}. ${JSON.stringify(this.submitted)}</td>
             <td><input
                 type="text"
                 placeholder="Guess keyword"
                 .value=${this.value}
-                @input=${this.handleInput}
+                @input=${(e) => {
+                    this.value = e.target.value;
+                }}
                 @keypress=${this.handleKeyPress}
             /></td>
             <td></td>
@@ -100,11 +89,6 @@ class TiebreakerView extends LitElement {
         ];
     }
 
-    handleInput(e) {
-        const { index, value } = e.detail;
-        this.state.tiebreaker_inputs[index] = value;
-        this.state.update();
-    }
 
     handleSubmit(e) {
         const { index, guess } = e.detail;
@@ -115,15 +99,14 @@ class TiebreakerView extends LitElement {
         const myTeam = this.state.game.players.find((p) => p.id === this.state.user_info.id).team;
         const inputs = [];
 
-        for (let i = 0; i < this.state.game.settings.keyword_count; i++) {
+        for (let i = 0; i < this.state.game.settings.keyword_count; i += 1) {
             const submitted = this.state.game.inputs.tiebreaker.submitted[+myTeam][i];
+            console.log('rendering tiebreaker input', i, myTeam, submitted);
             inputs.push(html`
                 <tiebreaker-input
                     .index=${i}
-                    .value=${this.state.tiebreaker_inputs?.[i] || ''}
                     .submitted=${submitted}
-                    @tiebreaker-input=${this.handleInput.bind(this)}
-                    @submit-tiebreaker=${this.handleSubmit.bind(this)}
+                    @submit=${e => this.handleSubmit(e)}
                 ></tiebreaker-input>
             `);
         }

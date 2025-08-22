@@ -12,6 +12,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import (
     NoSuchElementException,
     StaleElementReferenceException,
+    DetachedShadowRootException,
 )
 
 
@@ -179,16 +180,17 @@ def do_input_intercept(root, index, round_index, strategy):
 
 def do_input_tiebreaker(root, index, round_index, strategy):
     for inp in root.find_elements(By.CSS_SELECTOR, "tiebreaker-input"):
-        textbox = inp.shadow_root.find_element(By.CSS_SELECTOR, "input[type=text]")
-        if textbox.get_attribute("value") == "":
-            textbox.send_keys("I guess, nope")
-            textbox.send_keys(Keys.ENTER)
-            time.sleep(0.1)
-            break
-        elif textbox.get_attribute("value") == "I guess, nope":
-            pass
-        else:
-            textbox.clear()
+        for textbox in inp.shadow_root.find_elements(
+            By.CSS_SELECTOR, "input[type=text]"
+        ):
+            if textbox.get_attribute("value") == "":
+                textbox.send_keys("I guess, nope")
+                textbox.send_keys(Keys.ENTER)
+                time.sleep(0.1)
+            elif textbox.get_attribute("value") == "I guess, nope":
+                pass
+            else:
+                textbox.clear()
 
 
 def do_input_actions(driver, index, strategy) -> Optional[str]:
@@ -225,6 +227,8 @@ def do_input_actions(driver, index, strategy) -> Optional[str]:
         if view is not None:
             do_input_tiebreaker(view.shadow_root, index, round_index, strategy)
     except StaleElementReferenceException:
+        return None
+    except DetachedShadowRootException:
         return None
 
     try:
